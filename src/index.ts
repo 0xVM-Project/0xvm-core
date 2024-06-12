@@ -1,4 +1,4 @@
-import Main from "./src/main";
+import Main from "./main";
 
 (async () => {
   console.log("start");
