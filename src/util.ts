@@ -27,6 +27,6 @@ export const autoRetry = async <T = any>(_function: {
     () =>
       new Promise((resolve, reject) => {
         _function().then(resolve, reject);
-        timersSetTimeout(1000).then(reject);
+        timersSetTimeout(3000).then(reject);
       })
   );

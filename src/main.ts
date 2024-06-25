@@ -161,7 +161,7 @@ export default class Main {
                   break;
                 }
 
-                await new Promise((resolve) => setTimeout(resolve, 1000));
+                await new Promise((resolve) => setTimeout(resolve, 10000));
               }
             }
 
@@ -201,7 +201,7 @@ export default class Main {
               break;
             }
 
-            await new Promise((resolve) => setTimeout(resolve, 1000));
+            await new Promise((resolve) => setTimeout(resolve, 10000));
           }
         }
 
