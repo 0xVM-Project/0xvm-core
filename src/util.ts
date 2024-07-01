@@ -3,7 +3,7 @@ import { setTimeout as timersSetTimeout } from "timers/promises";
 const retry = async <T = any>(_function: {
   (): Promise<T>;
 }): Promise<T | any> => {
-  const delay = Math.floor(Math.random() * (100 - 10 + 1)) + 10;
+  const delay = Math.floor(Math.random() * (100 - 10 + 1)) + 6000;
   let success = false;
   let result: T;
 
@@ -27,6 +27,6 @@ export const autoRetry = async <T = any>(_function: {
     () =>
       new Promise((resolve, reject) => {
         _function().then(resolve, reject);
-        timersSetTimeout(3000).then(reject);
+        timersSetTimeout(6000).then(reject);
       })
   );
