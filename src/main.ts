@@ -30,91 +30,81 @@ export default class Main {
           _progress.total = blockCount;
         }
 
-        Promise.all(
+        await Promise.all(
           inscriptionList.map(async (inscription) => {
             const inscriptionId = inscription?.entry?.id;
             const inscriptionContent = inscription?.content;
 
             if (inscriptionId && inscriptionContent) {
-              const transactionParsed =
-                this.core.parseTransaction(inscriptionContent);
+              const transactionParsed = await this.core.parseTransaction(
+                inscriptionContent
+              );
 
               if (transactionParsed) {
                 const transactionBase64Decoded =
-                  this.core.base64DecodeTransaction(transactionParsed);
+                  await this.core.base64DecodeTransaction(transactionParsed);
 
                 if (transactionBase64Decoded) {
-                  const transactionDecodedList = this.core.decodeTransaction(
-                    transactionBase64Decoded
-                  );
+                  const transactionDecodedList =
+                    await this.core.decodeTransaction(transactionBase64Decoded);
 
                   if (transactionDecodedList?.length) {
-                    return Promise.all(
+                    return await Promise.all(
                       transactionDecodedList.map(async (transactionDecoded) => {
                         const transactionAction =
                           transactionDecoded?.action ?? 0;
                         const transactionData = transactionDecoded?.data ?? "";
 
-                        const transaction =
-                          this.core.unSignTransaction(transactionData);
+                        if (transactionAction && transactionData) {
+                          const transaction = await this.core.unSignTransaction(
+                            transactionData
+                          );
 
-                        if (
-                          transactionAction &&
-                          [1, 2, 3, 4, 5].includes(transactionAction) &&
-                          transaction
-                        ) {
-                          const transactionSigned =
-                            await this.core.formatTransaction(
-                              transactionAction as CORE.Action,
-                              transaction
-                            );
+                          if (transaction) {
+                            let transactionSigned: string | undefined = "";
 
-                          if (transactionSigned) {
-                            const transactionSignedResult =
-                              await this.vm.sendRawTransaction(
-                                transactionSigned
-                              );
-                            console.log(
-                              "transactionSignedResult: ",
-                              transactionSignedResult
-                            );
+                            if ([1, 2, 3].includes(transactionAction)) {
+                              transactionSigned = transactionData;
+                            }
 
-                            if (transactionSignedResult) {
-                              const inscriptionTransaction =
-                                await this.core.addInscriptionTransaction(
+                            if ([4, 5].includes(transactionAction)) {
+                              transactionSigned =
+                                await this.core.formatTransaction(
+                                  transactionAction as CORE.Action,
                                   transaction
                                 );
+                            }
 
-                              if (inscriptionTransaction) {
-                                const inscriptionTransactionResult =
-                                  await this.vm.sendRawTransaction(
-                                    inscriptionTransaction
-                                  );
-                                console.log(
-                                  "inscriptionTransactionResult: ",
-                                  inscriptionTransactionResult
+                            console.log(
+                              "transactionSigned: ",
+                              transactionSigned
+                            );
+
+                            if (transactionSigned) {
+                              const transactionSignedResult =
+                                await this.vm.sendRawTransaction(
+                                  transactionSigned
                                 );
-                                return inscriptionTransactionResult;
+
+                              if (transactionSignedResult) {
+                                const inscriptionTransaction =
+                                  await this.core.addInscriptionTransaction(
+                                    transaction
+                                  );
+
+                                if (inscriptionTransaction) {
+                                  const inscriptionTransactionResult =
+                                    await this.vm.sendRawTransaction(
+                                      inscriptionTransaction
+                                    );
+                                  return inscriptionTransactionResult;
+                                }
                               }
                             }
                           }
                         }
                       })
-                    )
-                      .then((transactionDecodedListResult) => {
-                        console.log(
-                          "transactionDecodedListResult",
-                          transactionDecodedListResult
-                        );
-                        return transactionDecodedListResult;
-                      })
-                      .catch((error) => {
-                        console.error(
-                          "transactionDecodedListResult error: ",
-                          error
-                        );
-                        return undefined;
-                      });
+                    );
                   }
                 }
               }
@@ -122,58 +112,54 @@ export default class Main {
 
             return undefined;
           })
-        )
-          .then((inscriptionListResult) => {
-            console.log("inscriptionListResult", inscriptionListResult);
-          })
-          .catch((error) => {
-            console.error("inscriptionListResult error: ", error);
-          })
-          .finally(async () => {
-            const createBlockResult = await this.vm.createBlock();
-            console.log("createBlockResult", createBlockResult);
+        );
 
-            // const btcBlockHash = await this.bitcoin.getBlockHashByHeight(_height);
-            // console.log("btcBlockHash: ", btcBlockHash);
+        // console.log("inscriptionListResult", inscriptionListResult);
+        const createBlockResult = await this.vm.createBlock();
+        console.log("createBlockResult", createBlockResult);
 
-            // if(btcBlockHash){
-            //   const btcBlock = await this.bitcoin.getBlockByHash(btcBlockHash);
-            //   console.log("btcBlock: ", btcBlock);
-            //   const latestTimestamp = await this.vm.getLatestTimestampByHeight(_height)
-            //   console.log("latestTimestamp: ", latestTimestamp);
+        // const btcBlockHash = await this.bitcoin.getBlockHashByHeight(_height);
+        // console.log("btcBlockHash: ", btcBlockHash);
 
-            //   if(btcBlock && latestTimestamp){
-            //     const timestamp = btcBlock.time > latestTimestamp ? btcBlock.time : latestTimestamp + 1
-            //   }
-            // }
+        // if (btcBlockHash) {
+        //   const btcBlock = await this.bitcoin.getBlockByHash(btcBlockHash);
+        //   console.log("btcBlock: ", btcBlock);
+        //   const latestTimestamp = await this.vm.getLatestTimestampByHeight(
+        //     _height
+        //   );
+        //   console.log("latestTimestamp: ", latestTimestamp);
 
-            _progress.tick();
+        //   if (btcBlock && latestTimestamp) {
+        //     const timestamp =
+        //       btcBlock.time > latestTimestamp
+        //         ? btcBlock.time
+        //         : latestTimestamp + 1;
+        //   }
+        // }
 
-            if (_height >= blockCount) {
-              while (true) {
-                const newBlock = await this.ordinal.getBlockByHeight(_height);
-                console.log("newBlock: ", newBlock);
+        _progress.tick();
 
-                if (
-                  newBlock?.block_count &&
-                  newBlock?.block_count > blockCount
-                ) {
-                  break;
-                }
+        if (_height >= blockCount) {
+          while (true) {
+            const newBlock = await this.ordinal.getBlockByHeight(_height);
+            console.log("newBlock: ", newBlock);
 
-                await new Promise((resolve) => setTimeout(resolve, 60000));
-              }
+            if (newBlock?.block_count && newBlock?.block_count > blockCount) {
+              break;
             }
 
-            await this.fetch(_height + 1, _progress);
-          });
+            await new Promise((resolve) => setTimeout(resolve, 60000));
+          }
+        }
+
+        await this.fetch(_height + 1, _progress);
       }
     }
   };
 
   public initial = async () => {
     const latestBlockNumber = await this.vm.getLatestBlock();
-    // const latestBlockNumber = 113;
+    // const latestBlockNumber = 2865304;
     console.log("latestBlockNumber: ", latestBlockNumber);
 
     if (latestBlockNumber) {
@@ -182,6 +168,8 @@ export default class Main {
       );
       console.log("ordinalBlock: ", ordinalBlock);
       const blockCount = ordinalBlock?.block_count;
+      // const blockCount = 2865305;
+      console.log("blockCount: ", blockCount);
 
       if (ordinalBlock && blockCount) {
         const progress = new Progress(":bar :current/:total", {
