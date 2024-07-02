@@ -166,7 +166,7 @@ export default class Main {
     // const latestBlockNumber = 2865304;
     console.log("XVM blockHeight: ", latestBlockNumber);
 
-    if (latestBlockNumber) {
+    if (latestBlockNumber || latestBlockNumber === 0) {
       while (latestBlockNumber < latestBlock) {
         const createBlockResult = await this.vm.createBlock();
         process.stdout.write(
@@ -175,6 +175,9 @@ export default class Main {
 
         if (createBlockResult) {
           latestBlockNumber = await this.vm.getLatestBlock();
+        } else {
+          console.error("createBlock failed");
+          return;
         }
       }
 
