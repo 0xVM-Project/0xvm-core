@@ -26,7 +26,7 @@ export default class Core {
     this.wallet = new ethers.Wallet(sendTokenPrivateKey, this.provider);
   }
 
-  public parseTransaction = (_string?: string) => {
+  public parseTransaction = async (_string?: string) => {
     let result = "";
 
     if (_string && _string.length >= 6) {
@@ -42,7 +42,7 @@ export default class Core {
     return result;
   };
 
-  public base64DecodeTransaction = (_string?: string) => {
+  public base64DecodeTransaction = async (_string?: string) => {
     let result = new Uint8Array();
 
     if (
@@ -58,7 +58,7 @@ export default class Core {
     return result;
   };
 
-  public decodeTransaction = (_string?: Uint8Array) => {
+  public decodeTransaction = async (_string?: Uint8Array) => {
     let result: CORE.JsonObjectList = [];
 
     if (_string && _string?.length > 0) {
@@ -83,7 +83,7 @@ export default class Core {
     return result;
   };
 
-  public unSignTransaction = (_string?: string) => {
+  public unSignTransaction = async (_string?: string) => {
     let result = undefined;
 
     if (_string) {
@@ -104,15 +104,15 @@ export default class Core {
     if (_action && _string) {
       let _transaction: CORE.Transaction | undefined = undefined;
 
-      if (_action === 1 || _action === 2 || _action === 3) {
-        _transaction = {
-          ..._string,
-          type: _string?.type ?? undefined,
-          gasPrice: _string?.gasPrice?.mul(inscriptionAccuracy),
-          gasLimit: _string?.gasLimit?.mul(inscriptionAccuracy),
-          value: _string?.value?.mul(inscriptionAccuracy),
-        };
-      }
+      // if (_action === 1 || _action === 2 || _action === 3) {
+      //   _transaction = {
+      //     ..._string,
+      //     type: _string?.type ?? undefined,
+      //     gasPrice: _string?.gasPrice?.mul(inscriptionAccuracy),
+      //     gasLimit: _string?.gasLimit?.mul(inscriptionAccuracy),
+      //     value: _string?.value?.mul(inscriptionAccuracy),
+      //   };
+      // }
 
       if (_action === 4 && _inscriptionId) {
         const fromAddress = _string?.from;
@@ -136,7 +136,9 @@ export default class Core {
           const output = await this.ordinal.getOutputById(_inscriptionId);
 
           if (output && output?.address === btcAddress && output?.value) {
-            const value = BigNumber.from(output?.value * inscriptionAccuracy);
+            const value = BigNumber.from(output?.value).mul(
+              inscriptionAccuracy
+            );
 
             _transaction = {
               ..._string,
@@ -190,6 +192,7 @@ export default class Core {
         }
       }
 
+      console.log("_transaction: ", _transaction);
       if (_transaction) {
         result = await this.wallet.signTransaction(
           Object.assign({}, _transaction, {
@@ -212,7 +215,9 @@ export default class Core {
     if (_string && fromAddress) {
       const gasPrice = await this.provider.getGasPrice();
       const feeData = await this.provider.getFeeData();
-      const value = ethers.utils.formatEther(546 * inscriptionAccuracy);
+      const value = ethers.utils.parseEther(
+        BigNumber.from(546).mul(inscriptionAccuracy).toString()
+      );
       let nonce = this.nonce?.find(
         (_item) => _item.address.toLowerCase() === fromAddress.toLowerCase()
       )?.nonce;
@@ -239,7 +244,13 @@ export default class Core {
       };
 
       if (_transaction) {
-        result = await this.wallet.signTransaction(_transaction);
+        result = await this.wallet.signTransaction(
+          Object.assign({}, _transaction, {
+            v: undefined,
+            r: undefined,
+            s: undefined,
+          })
+        );
       }
     }
 
