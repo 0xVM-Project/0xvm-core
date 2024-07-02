@@ -3,6 +3,7 @@ import Vm from "./vm";
 import Ordinal from "./ordinal";
 import Core from "./core";
 import Progress from "progress";
+import { latestBlock } from "./config";
 
 export default class Main {
   private bitcoin;
@@ -20,7 +21,10 @@ export default class Main {
   private fetch = async (_height?: number, _progress?: Progress) => {
     if (_height && _progress) {
       const ordinalBlock = await this.ordinal.getBlockByHeight(_height);
-      console.log("fetch ordinalBlock: ", ordinalBlock);
+      // console.log(
+      //   "fetch ordinalBlock: ",
+      //   ordinalBlock?.inscriptions?.length ?? 0
+      // );
 
       if (ordinalBlock) {
         const blockCount = ordinalBlock?.block_count ?? 0;
@@ -142,13 +146,13 @@ export default class Main {
         if (_height >= blockCount) {
           while (true) {
             const newBlock = await this.ordinal.getBlockByHeight(_height);
-            console.log("newBlock: ", newBlock);
+            // console.log("newBlock: ", newBlock?.inscriptions?.length ?? 0);
 
             if (newBlock?.block_count && newBlock?.block_count > blockCount) {
               break;
             }
 
-            await new Promise((resolve) => setTimeout(resolve, 60000));
+            await new Promise((resolve) => setTimeout(resolve, 20000));
           }
         }
 
@@ -158,18 +162,31 @@ export default class Main {
   };
 
   public initial = async () => {
-    const latestBlockNumber = await this.vm.getLatestBlock();
+    let latestBlockNumber = await this.vm.getLatestBlock();
     // const latestBlockNumber = 2865304;
-    console.log("latestBlockNumber: ", latestBlockNumber);
+    console.log("XVM blockHeight: ", latestBlockNumber);
 
     if (latestBlockNumber) {
+      while (latestBlockNumber < latestBlock) {
+        const createBlockResult = await this.vm.createBlock();
+        process.stdout.write(
+          `\r fetch latest XVM blockHeight: ${latestBlockNumber} / ${latestBlock} createBlock: ${createBlockResult}`
+        );
+
+        if (createBlockResult) {
+          latestBlockNumber = await this.vm.getLatestBlock();
+        }
+      }
+
+      process.stdout.write(`\n`);
+
       const ordinalBlock = await this.ordinal.getBlockByHeight(
         latestBlockNumber
       );
-      console.log("ordinalBlock: ", ordinalBlock);
+      // console.log("ordinalBlock: ", ordinalBlock?.inscriptions?.length ?? 0);
       const blockCount = ordinalBlock?.block_count;
       // const blockCount = 2865305;
-      console.log("blockCount: ", blockCount);
+      // console.log("blockCount: ", blockCount);
 
       if (ordinalBlock && blockCount) {
         const progress = new Progress(":bar :current/:total", {
@@ -183,13 +200,13 @@ export default class Main {
             const newBlock = await this.ordinal.getBlockByHeight(
               latestBlockNumber
             );
-            console.log("newBlock: ", newBlock);
+            // console.log("newBlock: ", newBlock?.inscriptions?.length ?? 0);
 
             if (newBlock?.block_count && newBlock?.block_count > blockCount) {
               break;
             }
 
-            await new Promise((resolve) => setTimeout(resolve, 60000));
+            await new Promise((resolve) => setTimeout(resolve, 20000));
           }
         }
 

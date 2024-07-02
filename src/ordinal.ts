@@ -31,7 +31,12 @@ export default class Ordinal {
       );
     }
 
-    console.log("getBlockByHeight: ", result);
+    console.log(
+      "BTC blockHeight: ",
+      result?.block_count,
+      "   inscriptions count: ",
+      result?.inscriptions?.length ?? 0
+    );
     return result;
   };
 

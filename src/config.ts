@@ -18,7 +18,7 @@ export const databasePassword = process.env?.DATABASE_PASSWORD ?? "";
 export const databaseName = process.env?.DATABASE_NAME ?? "";
 export const latestBlock = process.env?.LATEST_BLOCK
   ? Number(process.env?.LATEST_BLOCK)
-  : 822267;
+  : 2865304;
 export const latestTimestamp = process.env?.LATEST_TIMESTAMP
   ? Number(process.env?.LATEST_TIMESTAMP)
   : Math.floor(Date.now() / 1000);
