@@ -104,7 +104,7 @@ export default class Main {
                               if (transactionSignedResult) {
                                 console.log(
                                   "transaction hash:",
-                                  createBlockResult
+                                  transactionSignedResult
                                 );
                                 const inscriptionTransaction =
                                   await this.core.addInscriptionTransaction(
