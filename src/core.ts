@@ -136,27 +136,23 @@ export default class Core {
       // }
 
       if (_action === 4 && _inscriptionId) {
-        const fromAddress = _string?.from;
+        const fromAddress = tokenAddress;
+        const toAddress = _string?.from ?? "";
 
-        if (fromAddress) {
+        if (fromAddress && toAddress) {
           const gasPrice = await this.provider.getGasPrice();
-          // let nonce = this.nonce?.find(
-          //   (_item) => _item.address.toLowerCase() === fromAddress.toLowerCase()
-          // )?.nonce;
+          let nonce = this.nonce?.find(
+            (_item) => _item.address.toLowerCase() === fromAddress.toLowerCase()
+          )?.nonce;
 
-          // if (!nonce) {
-          //   nonce = await this.provider.getTransactionCount(
-          //     fromAddress,
-          //     "latest"
-          //   );
-          // }
+          if (!nonce) {
+            nonce = await this.provider.getTransactionCount(
+              fromAddress,
+              "latest"
+            );
+          }
 
-          // nonce += 1;
-          // this.nonce.push({ address: fromAddress.toLowerCase(), nonce });
-          const nonce = await this.provider.getTransactionCount(
-            fromAddress,
-            "latest"
-          );
+          this.nonce.push({ address: fromAddress.toLowerCase(), nonce });
           const feeData = await this.provider.getFeeData();
           const output = await this.ordinal.getOutputById(_inscriptionId);
 
@@ -165,8 +161,8 @@ export default class Core {
               inscriptionAccuracy
             );
             _transaction = {
-              to: fromAddress,
-              from: tokenAddress,
+              to: toAddress,
+              from: fromAddress,
               nonce,
               gasPrice,
               data: "",
@@ -180,6 +176,7 @@ export default class Core {
             if (_transaction) {
               console.log("formatTransaction: ", _transaction);
               result = await this.wallet.signTransaction(_transaction);
+              nonce += 1;
             }
           }
         }
@@ -227,32 +224,28 @@ export default class Core {
 
   public addInscriptionTransaction = async (_string?: ethers.Transaction) => {
     let result = undefined;
-    const fromAddress = _string?.from;
+    const fromAddress = tokenAddress;
+    const toAddress = _string?.from ?? "";
 
-    if (_string && fromAddress) {
+    if (_string && fromAddress && toAddress) {
       const gasPrice = await this.provider.getGasPrice();
       const feeData = await this.provider.getFeeData();
       const value = ethers.utils.parseEther(
         BigNumber.from(546).mul(inscriptionAccuracy).toString()
       );
-      // let nonce = this.nonce?.find(
-      //   (_item) => _item.address.toLowerCase() === fromAddress.toLowerCase()
-      // )?.nonce;
+      let nonce = this.nonce?.find(
+        (_item) => _item.address.toLowerCase() === fromAddress.toLowerCase()
+      )?.nonce;
 
-      // if (!nonce) {
-      //   nonce = await this.provider.getTransactionCount(fromAddress, "latest");
-      // }
+      if (!nonce) {
+        nonce = await this.provider.getTransactionCount(fromAddress, "latest");
+      }
 
-      // nonce += 1;
-      // this.nonce.push({ address: fromAddress.toLowerCase(), nonce });
-      const nonce = await this.provider.getTransactionCount(
-        fromAddress,
-        "latest"
-      );
+      this.nonce.push({ address: fromAddress.toLowerCase(), nonce });
 
       let _transaction: CORE.Transaction = {
-        to: _string?.to ?? "",
-        from: tokenAddress,
+        to: toAddress,
+        from: fromAddress,
         nonce,
         gasPrice,
         data: "",
@@ -268,6 +261,7 @@ export default class Core {
         // _transaction = { ..._transaction, gasLimit };
         console.log("addInscriptionTransaction transaction: ", _transaction);
         result = await this.wallet.signTransaction(_transaction);
+        nonce += 1;
       }
     }
 
