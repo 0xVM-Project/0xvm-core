@@ -39,7 +39,17 @@ export default class Core {
     }
 
     if (result) {
-      console.log("parseTransaction: ", result);
+      console.log(
+        "current inscription content: ",
+        _string,
+        "parseTransaction: ",
+        result
+      );
+    } else {
+      console.log(
+        "current inscription content: ",
+        _string ? _string?.slice(0, 6) : ""
+      );
     }
 
     return result;
