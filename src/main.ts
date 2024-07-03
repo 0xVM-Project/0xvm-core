@@ -102,6 +102,10 @@ export default class Main {
                                 );
 
                               if (transactionSignedResult) {
+                                console.log(
+                                  "transaction hash:",
+                                  createBlockResult
+                                );
                                 const inscriptionTransaction =
                                   await this.core.addInscriptionTransaction(
                                     transaction
@@ -112,6 +116,10 @@ export default class Main {
                                     await this.vm.sendRawTransaction(
                                       inscriptionTransaction
                                     );
+                                  console.log(
+                                    "inscription hash:",
+                                    inscriptionTransactionResult
+                                  );
                                   return inscriptionTransactionResult;
                                 }
                               }
