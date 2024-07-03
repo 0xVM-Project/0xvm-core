@@ -262,10 +262,7 @@ export default class Core {
         data: "",
         value,
         chainId,
-        type: _string?.type ?? undefined,
-        v: undefined,
-        r: undefined,
-        s: undefined,
+        // type: _string?.type ?? undefined,
         //   maxFeePerGas: feeData.maxFeePerGas ?? undefined,
         //   maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ?? undefined,
       };
