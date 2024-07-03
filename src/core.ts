@@ -241,6 +241,7 @@ export default class Core {
         nonce = await this.provider.getTransactionCount(fromAddress, "latest");
       }
 
+      nonce += 1;
       this.nonce.push({ address: fromAddress.toLowerCase(), nonce });
 
       let _transaction: CORE.Transaction = {
@@ -261,7 +262,6 @@ export default class Core {
         // _transaction = { ..._transaction, gasLimit };
         console.log("addInscriptionTransaction transaction: ", _transaction);
         result = await this.wallet.signTransaction(_transaction);
-        nonce += 1;
       }
     }
 
