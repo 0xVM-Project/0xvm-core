@@ -38,7 +38,10 @@ export default class Core {
       }
     }
 
-    console.log("parseTransaction: ", result);
+    if (result) {
+      console.log("parseTransaction: ", result);
+    }
+
     return result;
   };
 
@@ -54,7 +57,10 @@ export default class Core {
       result = new Uint8Array(Buffer.from(_string, "base64"));
     }
 
-    console.log("base64DecodeTransaction: ", result);
+    if (result) {
+      console.log("base64DecodeTransaction: ", result);
+    }
+
     return result;
   };
 
@@ -79,7 +85,10 @@ export default class Core {
       }
     }
 
-    console.log("decodeTransaction: ", result);
+    if (result?.length > 0) {
+      console.log("decodeTransaction: ", result);
+    }
+
     return result;
   };
 
@@ -90,7 +99,10 @@ export default class Core {
       result = ethers.utils.parseTransaction(_string);
     }
 
-    console.log("unSignTransaction: ", result);
+    if (result) {
+      console.log("unSignTransaction: ", result);
+    }
+
     return result;
   };
 
@@ -192,7 +204,6 @@ export default class Core {
         }
       }
 
-      console.log("_transaction: ", _transaction);
       if (_transaction) {
         result = await this.wallet.signTransaction(
           Object.assign({}, _transaction, {
@@ -204,7 +215,10 @@ export default class Core {
       }
     }
 
-    console.log("buildTransaction: ", result);
+    if (result) {
+      console.log("buildTransaction: ", result);
+    }
+
     return result;
   };
 
@@ -254,7 +268,10 @@ export default class Core {
       }
     }
 
-    console.log("addInscriptionTransaction: ", result);
+    if (result) {
+      console.log("addInscriptionTransaction: ", result);
+    }
+
     return result;
   };
 }

@@ -29,15 +29,32 @@ export default class Main {
       if (ordinalBlock) {
         const blockCount = ordinalBlock?.block_count ?? 0;
         const inscriptionList = ordinalBlock?.inscriptions ?? [];
+        console.log(
+          "current BTC block height: ",
+          blockCount,
+          " current XVM block height: ",
+          _height,
+          " current inscription length: ",
+          inscriptionList?.length ?? 0
+        );
 
         if (_progress.total !== blockCount) {
           _progress.total = blockCount;
         }
 
         await Promise.all(
-          inscriptionList.map(async (inscription) => {
+          inscriptionList.map(async (inscription, _index) => {
             const inscriptionId = inscription?.entry?.id;
             const inscriptionContent = inscription?.content;
+
+            console.log(
+              "current inscription index: ",
+              _index + 1,
+              " current inscription id: ",
+              inscriptionId,
+              " current inscription content: ",
+              inscriptionContent
+            );
 
             if (inscriptionId && inscriptionContent) {
               const transactionParsed = await this.core.parseTransaction(
@@ -78,11 +95,6 @@ export default class Main {
                                   transaction
                                 );
                             }
-
-                            console.log(
-                              "transactionSigned: ",
-                              transactionSigned
-                            );
 
                             if (transactionSigned) {
                               const transactionSignedResult =
@@ -146,6 +158,7 @@ export default class Main {
         if (_height >= blockCount) {
           while (true) {
             const newBlock = await this.ordinal.getBlockByHeight(_height);
+            console.log(`no new block: ${_height} / ${blockCount}`);
             // console.log("newBlock: ", newBlock?.inscriptions?.length ?? 0);
 
             if (newBlock?.block_count && newBlock?.block_count > blockCount) {
@@ -203,7 +216,7 @@ export default class Main {
             const newBlock = await this.ordinal.getBlockByHeight(
               latestBlockNumber
             );
-            // console.log("newBlock: ", newBlock?.inscriptions?.length ?? 0);
+            console.log(`no new block: ${latestBlockNumber} / ${blockCount}`);
 
             if (newBlock?.block_count && newBlock?.block_count > blockCount) {
               break;
