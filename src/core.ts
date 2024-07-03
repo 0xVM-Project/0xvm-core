@@ -160,23 +160,23 @@ export default class Core {
             const value = BigNumber.from(output?.value).mul(
               inscriptionAccuracy
             );
-
             _transaction = {
-              ..._string,
-              type: _string?.type ?? undefined,
-              from: tokenAddress,
               to: fromAddress,
+              from: tokenAddress,
               nonce,
               gasPrice,
               data: "",
               value,
               chainId,
-              //   maxFeePerGas: feeData.maxFeePerGas ?? undefined,
-              //   maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ?? undefined,
             };
 
             const gasLimit = await this.provider.estimateGas(_transaction);
             _transaction = { ..._transaction, gasLimit };
+
+            if (_transaction) {
+              console.log("formatTransaction: ", _transaction);
+              result = await this.wallet.signTransaction(_transaction);
+            }
           }
         }
       }
@@ -212,16 +212,6 @@ export default class Core {
           console.error("buildTransaction: ", error);
         }
       }
-
-      if (_transaction) {
-        result = await this.wallet.signTransaction(
-          Object.assign({}, _transaction, {
-            v: undefined,
-            r: undefined,
-            s: undefined,
-          })
-        );
-      }
     }
 
     if (result) {
@@ -252,11 +242,10 @@ export default class Core {
       nonce += 1;
       this.nonce.push({ address: fromAddress.toLowerCase(), nonce });
 
-      const _transaction = {
+      let _transaction: CORE.Transaction = {
         to: _string?.to ?? "",
         from: tokenAddress,
         nonce,
-        gasLimit: _string?.gasLimit,
         gasPrice,
         data: "",
         value,
@@ -267,6 +256,8 @@ export default class Core {
       };
 
       if (_transaction) {
+        // const gasLimit = await this.provider.estimateGas(_transaction);
+        // _transaction = { ..._transaction, gasLimit };
         console.log("addInscriptionTransaction transaction: ", _transaction);
         result = await this.wallet.signTransaction(_transaction);
       }
