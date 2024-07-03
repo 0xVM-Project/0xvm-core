@@ -230,9 +230,7 @@ export default class Core {
     if (_string && fromAddress && toAddress) {
       const gasPrice = await this.provider.getGasPrice();
       const feeData = await this.provider.getFeeData();
-      const value = ethers.utils.parseEther(
-        BigNumber.from(546).mul(inscriptionAccuracy).toString()
-      );
+      const value = BigNumber.from(546).mul(inscriptionAccuracy);
       let nonce = this.nonce?.find(
         (_item) => _item.address.toLowerCase() === fromAddress.toLowerCase()
       )?.nonce;
@@ -258,8 +256,8 @@ export default class Core {
       };
 
       if (_transaction) {
-        // const gasLimit = await this.provider.estimateGas(_transaction);
-        // _transaction = { ..._transaction, gasLimit };
+        const gasLimit = await this.provider.estimateGas(_transaction);
+        _transaction = { ..._transaction, gasLimit };
         console.log("addInscriptionTransaction transaction: ", _transaction);
         result = await this.wallet.signTransaction(_transaction);
       }
