@@ -58,13 +58,12 @@ export default class Core {
   public base64DecodeTransaction = async (_string?: string) => {
     let result = new Uint8Array();
 
-    if (
-      _string &&
-      /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
-        _string
-      )
-    ) {
-      result = new Uint8Array(Buffer.from(_string, "base64"));
+    if (_string) {
+      try {
+        result = new Uint8Array(Buffer.from(_string, "base64"));
+      } catch (error) {
+        console.error("base64DecodeTransaction error: ", error);
+      }
     }
 
     if (result) {
