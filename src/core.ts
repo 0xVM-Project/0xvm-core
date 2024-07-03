@@ -254,32 +254,30 @@ export default class Core {
       this.nonce.push({ address: fromAddress.toLowerCase(), nonce });
 
       const _transaction = {
-        ..._string,
-        type: _string?.type ?? undefined,
-        from: tokenAddress,
         to: _string?.to ?? "",
+        from: tokenAddress,
         nonce,
+        gasLimit: _string?.gasLimit,
         gasPrice,
         data: "",
         value,
         chainId,
+        type: _string?.type ?? undefined,
+        v: undefined,
+        r: undefined,
+        s: undefined,
         //   maxFeePerGas: feeData.maxFeePerGas ?? undefined,
         //   maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ?? undefined,
       };
 
       if (_transaction) {
-        result = await this.wallet.signTransaction(
-          Object.assign({}, _transaction, {
-            v: undefined,
-            r: undefined,
-            s: undefined,
-          })
-        );
+        console.log("addInscriptionTransaction transaction: ", _transaction);
+        result = await this.wallet.signTransaction(_transaction);
       }
     }
 
     if (result) {
-      console.log("addInscriptionTransaction: ", result);
+      console.log("addInscriptionTransaction result: ", result);
     }
 
     return result;
