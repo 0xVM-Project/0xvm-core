@@ -53,7 +53,7 @@ export default class Main {
               " current inscription id: ",
               inscriptionId,
               " current inscription content: ",
-              inscriptionContent
+              inscriptionContent ? inscriptionContent?.slice(0, 512) : ""
             );
 
             if (inscriptionId && inscriptionContent) {
@@ -176,7 +176,7 @@ export default class Main {
 
   public initial = async () => {
     let latestBlockNumber = await this.vm.getLatestBlock();
-    // const latestBlockNumber = 2865304;
+    // const latestBlockNumber = 2865303;
     console.log("XVM blockHeight: ", latestBlockNumber);
 
     if (latestBlockNumber || latestBlockNumber === 0) {
