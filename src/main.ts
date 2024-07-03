@@ -152,7 +152,7 @@ export default class Main {
               break;
             }
 
-            await new Promise((resolve) => setTimeout(resolve, 20000));
+            await new Promise((resolve) => setTimeout(resolve, 60000));
           }
         }
 
@@ -209,7 +209,7 @@ export default class Main {
               break;
             }
 
-            await new Promise((resolve) => setTimeout(resolve, 20000));
+            await new Promise((resolve) => setTimeout(resolve, 60000));
           }
         }
 
