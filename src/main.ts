@@ -90,7 +90,8 @@ export default class Main {
                               transactionSigned =
                                 await this.core.formatTransaction(
                                   transactionAction as CORE.Action,
-                                  transaction
+                                  transaction,
+                                  inscriptionId
                                 );
                             }
 
