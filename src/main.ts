@@ -51,9 +51,7 @@ export default class Main {
               "current inscription index: ",
               _index + 1,
               " current inscription id: ",
-              inscriptionId,
-              " current inscription content: ",
-              inscriptionContent ? inscriptionContent?.slice(0, 512) : ""
+              inscriptionId
             );
 
             if (inscriptionId && inscriptionContent) {
