@@ -109,7 +109,9 @@ export default class Main {
                             if (transactionSigned) {
                               const transactionSignedResult =
                                 await this.vm.sendRawTransaction(
-                                  transactionSigned
+                                  transactionAction === 5
+                                    ? transactionData
+                                    : transactionSigned
                                 );
 
                               if (transactionSignedResult) {
@@ -121,6 +123,12 @@ export default class Main {
                                 if (transactionAction === 5) {
                                   const database = new Database();
                                   const params = JSON.parse(transactionSigned);
+                                  console.log(
+                                    "insertWithdrawBtc params: ",
+                                    transactionSigned,
+                                    " insertWithdrawBtc hash: ",
+                                    transactionSignedResult
+                                  );
                                   const insertWithdrawBtcResult =
                                     await database.insertWithdrawBtc(
                                       params?.fromAddress ?? "",

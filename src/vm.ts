@@ -27,11 +27,13 @@ export default class Vm {
 
         if (response?.data && !response?.data?.error) {
           return response.data;
+        } else {
+          console.error("call error: ", response);
         }
 
         return undefined;
       } catch (error) {
-        console.error("getBlockHashByHeight error: ", error);
+        console.error("call error: ", error);
         return undefined;
       }
     } else {
@@ -75,6 +77,8 @@ export default class Vm {
 
       if (result && result?.result && !result?.error) {
         return result?.result;
+      } else {
+        console.error("sendRawTransaction error: ", result);
       }
     }
 
