@@ -4,6 +4,7 @@ import Ordinal from "./ordinal";
 import Core from "./core";
 import Progress from "progress";
 import { latestBlock } from "./config";
+import Database from "./database";
 
 export default class Main {
   private bitcoin;
@@ -100,12 +101,9 @@ export default class Main {
                                 await this.core.formatTransaction(
                                   transactionAction as CORE.Action,
                                   transaction,
-                                  inscriptionId
+                                  inscriptionId,
+                                  transactionData
                                 );
-
-                              if (transactionSigned) {
-                                transactionSigned = transactionData;
-                              }
                             }
 
                             if (transactionSigned) {
@@ -119,11 +117,27 @@ export default class Main {
                                   "transaction hash:",
                                   transactionSignedResult
                                 );
+
+                                if (transactionAction === 5) {
+                                  const database = new Database();
+                                  const params = JSON.parse(transactionSigned);
+                                  const insertWithdrawBtcResult =
+                                    await database.insertWithdrawBtc(
+                                      params?.fromAddress ?? "",
+                                      params?.toAddress ?? "",
+                                      params?.value ?? 0,
+                                      transactionSignedResult
+                                    );
+
+                                  if (!insertWithdrawBtcResult) {
+                                    return undefined;
+                                  }
+                                }
+
                                 const inscriptionTransaction =
                                   await this.core.addInscriptionTransaction(
                                     transaction
                                   );
-
                                 if (inscriptionTransaction) {
                                   const inscriptionTransactionResult =
                                     await this.vm.sendRawTransaction(

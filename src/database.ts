@@ -31,7 +31,7 @@ export default class Database {
     if (_fromAddress && _toAddress && _amount && _hash) {
       try {
         const insertQuery = `
-        INSERT INTO withdraw (from_address, to_address, amount, tx_hash)
+        INSERT INTO withdraw (from_address, to_address, amount, evm_hash)
         VALUES (?, ?, ?, ?)
     `;
         const values = [_fromAddress, _toAddress, _amount, _hash];
