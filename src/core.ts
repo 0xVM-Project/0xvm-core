@@ -190,6 +190,7 @@ export default class Core {
 
           if (hash && fromAddress && value && value.gt(BigNumber.from(0))) {
             const receipt = await this.provider.getTransactionReceipt(hash);
+            console.log("receipt: ", receipt);
 
             if (
               receipt &&
