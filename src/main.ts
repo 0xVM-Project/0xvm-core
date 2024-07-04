@@ -148,7 +148,8 @@ export default class Main {
 
                                 const inscriptionTransaction =
                                   await this.core.addInscriptionTransaction(
-                                    transaction
+                                    transaction,
+                                    transactionAction
                                   );
                                 if (inscriptionTransaction) {
                                   const inscriptionTransactionResult =
