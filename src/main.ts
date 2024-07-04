@@ -43,6 +43,9 @@ export default class Main {
           _progress.total = blockCount;
         }
 
+        const indexList: number[] = [];
+        const successIndexList: number[] = [];
+
         await Promise.all(
           inscriptionList.map(async (inscription, _index) => {
             const inscriptionId = inscription?.entry?.id;
@@ -61,6 +64,7 @@ export default class Main {
               );
 
               if (transactionParsed) {
+                indexList.push(_index);
                 const transactionBase64Decoded =
                   await this.core.base64DecodeTransaction(transactionParsed);
 
@@ -155,6 +159,7 @@ export default class Main {
                                     "inscription hash:",
                                     inscriptionTransactionResult
                                   );
+                                  successIndexList.push(_index);
                                   return inscriptionTransactionResult;
                                 }
                               }
@@ -172,7 +177,22 @@ export default class Main {
           })
         );
 
-        // console.log("inscriptionListResult", inscriptionListResult);
+        console.log(
+          "available index list: ",
+          indexList,
+          "success index list: ",
+          successIndexList
+        );
+        if (
+          !(
+            indexList.length === successIndexList.length &&
+            indexList.every(
+              (_item, _index) => _item === successIndexList[_index]
+            )
+          )
+        ) {
+          return;
+        }
         const createBlockResult = await this.vm.createBlock();
         console.log("createBlockResult", createBlockResult);
 
