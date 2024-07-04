@@ -86,13 +86,26 @@ export default class Main {
                               transactionSigned = transactionData;
                             }
 
-                            if ([4, 5].includes(transactionAction)) {
+                            if (transactionAction === 4) {
                               transactionSigned =
                                 await this.core.formatTransaction(
                                   transactionAction as CORE.Action,
                                   transaction,
                                   inscriptionId
                                 );
+                            }
+
+                            if (transactionAction === 5) {
+                              transactionSigned =
+                                await this.core.formatTransaction(
+                                  transactionAction as CORE.Action,
+                                  transaction,
+                                  inscriptionId
+                                );
+
+                              if (transactionSigned) {
+                                transactionSigned = transactionData;
+                              }
                             }
 
                             if (transactionSigned) {
