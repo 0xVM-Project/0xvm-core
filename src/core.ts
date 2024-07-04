@@ -132,18 +132,22 @@ export default class Core {
 
         if (fromAddress && toAddress) {
           const gasPrice = await this.provider.getGasPrice();
-          let nonce = this.nonce?.find(
-            (_item) => _item.address.toLowerCase() === fromAddress.toLowerCase()
-          )?.nonce;
+          // let nonce = this.nonce?.find(
+          //   (_item) => _item.address.toLowerCase() === fromAddress.toLowerCase()
+          // )?.nonce;
 
-          if (!nonce) {
-            nonce = await this.provider.getTransactionCount(
-              fromAddress,
-              "latest"
-            );
-          }
+          // if (!nonce) {
+          //   nonce = await this.provider.getTransactionCount(
+          //     fromAddress,
+          //     "latest"
+          //   );
+          // }
 
-          this.nonce.push({ address: fromAddress.toLowerCase(), nonce });
+          // this.nonce.push({ address: fromAddress.toLowerCase(), nonce });
+          const nonce = await this.provider.getTransactionCount(
+            fromAddress,
+            "latest"
+          );
           const feeData = await this.provider.getFeeData();
           const output = await this.ordinal.getOutputById(_inscriptionId);
 
@@ -167,7 +171,7 @@ export default class Core {
             if (_transaction) {
               console.log("formatTransaction: ", _transaction);
               result = await this.wallet.signTransaction(_transaction);
-              nonce += 1;
+              // nonce += 1;
             }
           }
         }
@@ -213,21 +217,26 @@ export default class Core {
       const gasPrice = await this.provider.getGasPrice();
       const feeData = await this.provider.getFeeData();
       const value = BigNumber.from(546).mul(inscriptionAccuracy);
-      let nonce = this.nonce?.find(
-        (_item) => _item.address.toLowerCase() === fromAddress.toLowerCase()
-      )?.nonce;
+      // let nonce = this.nonce?.find(
+      //   (_item) => _item.address.toLowerCase() === fromAddress.toLowerCase()
+      // )?.nonce;
 
-      if (!nonce) {
-        nonce = await this.provider.getTransactionCount(fromAddress, "latest");
-      }
+      // if (!nonce) {
+      //   nonce = await this.provider.getTransactionCount(fromAddress, "latest");
+      // }
 
-      nonce += 1;
-      this.nonce.push({ address: fromAddress.toLowerCase(), nonce });
+      // nonce += 1;
+      // this.nonce.push({ address: fromAddress.toLowerCase(), nonce });
+
+      const nonce = await this.provider.getTransactionCount(
+        fromAddress,
+        "latest"
+      );
 
       let _transaction: CORE.Transaction = {
         to: toAddress,
         from: fromAddress,
-        nonce,
+        nonce: nonce + 1,
         gasPrice,
         data: "",
         value,
