@@ -208,7 +208,10 @@ export default class Core {
     return result;
   };
 
-  public addInscriptionTransaction = async (_string?: ethers.Transaction) => {
+  public addInscriptionTransaction = async (
+    _string?: ethers.Transaction,
+    _action?: number
+  ) => {
     let result = undefined;
     const fromAddress = tokenAddress;
     const toAddress = _string?.from ?? "";
@@ -236,7 +239,7 @@ export default class Core {
       let _transaction: CORE.Transaction = {
         to: toAddress,
         from: fromAddress,
-        nonce: nonce + 1,
+        nonce: _action === 4 ? nonce + 1 : nonce,
         gasPrice,
         data: "",
         value,
