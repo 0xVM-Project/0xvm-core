@@ -118,22 +118,13 @@ export default class Core {
   public formatTransaction = async (
     _action?: CORE.Action,
     _string?: ethers.Transaction,
-    _inscriptionId?: string
+    _inscriptionId?: string,
+    signedTransaction?: string
   ) => {
     let result = undefined;
 
     if (_action && _string) {
       let _transaction: CORE.Transaction | undefined = undefined;
-
-      // if (_action === 1 || _action === 2 || _action === 3) {
-      //   _transaction = {
-      //     ..._string,
-      //     type: _string?.type ?? undefined,
-      //     gasPrice: _string?.gasPrice?.mul(inscriptionAccuracy),
-      //     gasLimit: _string?.gasLimit?.mul(inscriptionAccuracy),
-      //     value: _string?.value?.mul(inscriptionAccuracy),
-      //   };
-      // }
 
       if (_action === 4 && _inscriptionId) {
         const fromAddress = tokenAddress;
@@ -182,36 +173,26 @@ export default class Core {
         }
       }
 
-      if (_action === 5) {
-        try {
-          const fromAddress = _string?.from;
-          const hash = _string?.hash;
-          const value = _string?.value?.mul(inscriptionAccuracy);
+      if (_action === 5 && signedTransaction) {
+        const fromAddress = _string?.from;
+        const toAddress = _string?.to;
+        const hash = _string?.hash;
+        const value = _string?.value;
 
-          if (hash && fromAddress && value && value.gt(BigNumber.from(0))) {
-            const receipt = await this.provider.getTransactionReceipt(hash);
-            console.log("receipt: ", receipt);
-
-            if (
-              receipt &&
-              receipt.to === tokenAddress &&
-              receipt.status === 1
-            ) {
-              const database = new Database();
-              const _result = await database.insertWithdrawBtc(
-                btcAddress,
-                fromAddress,
-                value.toNumber(),
-                hash
-              );
-
-              if (_result) {
-                return "true";
-              }
-            }
-          }
-        } catch (error) {
-          console.error("buildTransaction: ", error);
+        if (
+          fromAddress &&
+          toAddress &&
+          hash &&
+          value &&
+          value.gt(BigNumber.from(0)) &&
+          toAddress === tokenAddress
+        ) {
+          result = JSON.stringify({
+            fromAddress: btcAddress,
+            toAddress: fromAddress,
+            value: value.toNumber(),
+            hash,
+          });
         }
       }
     }
