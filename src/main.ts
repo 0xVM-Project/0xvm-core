@@ -5,6 +5,7 @@ import Core from "./core";
 import Progress from "progress";
 import { latestBlock } from "./config";
 import Database from "./database";
+import { getBtcWalletAccountByXvmAccount } from "./util";
 
 export default class Main {
   private bitcoin;
@@ -133,10 +134,17 @@ export default class Main {
                                     " insertWithdrawBtc hash: ",
                                     transactionSignedResult
                                   );
+                                  const btcWalletAddress =
+                                    await getBtcWalletAccountByXvmAccount(
+                                      params?.toAddress ?? ""
+                                    );
+                                  if (!btcWalletAddress) {
+                                    return undefined;
+                                  }
                                   const insertWithdrawBtcResult =
                                     await database.insertWithdrawBtc(
                                       params?.fromAddress ?? "",
-                                      params?.toAddress ?? "",
+                                      btcWalletAddress,
                                       params?.value ?? 0,
                                       transactionSignedResult
                                     );
