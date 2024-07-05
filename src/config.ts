@@ -7,7 +7,9 @@ export const bitcoinRpcUser = process.env?.BITCOIN_RPC_USER ?? "";
 export const bitcoinRpcPassword = process.env?.BITCOIN_RPC_PASSWORD ?? "";
 export const ordUrl = process.env?.ORD_URL ?? "";
 export const network = process.env?.NETWORK ?? "";
-export const chainId = process.env?.CHAIN_ID ? Number(process.env?.CHAIN_ID)  : 42;
+export const chainId = process.env?.CHAIN_ID
+  ? Number(process.env?.CHAIN_ID)
+  : 42;
 export const databasePath = process.env?.DB_PATH ?? "";
 export const btcAddress = process.env?.BTC_ADDRESS ?? "";
 export const tokenAddress = process.env?.TOKEN_ADDRESS ?? "";
@@ -25,3 +27,4 @@ export const latestTimestamp = process.env?.LATEST_TIMESTAMP
 export const inscriptionLabel = "0f0";
 export const inscriptionVersion = "001";
 export const inscriptionAccuracy = 1e10;
+export const walletAccountUrl = process.env?.WALLET_ACCOUNT_URL ?? "";
