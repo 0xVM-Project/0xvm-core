@@ -165,8 +165,10 @@ export default class Core {
               chainId,
             };
 
+            console.log("formatTransaction _transaction1: ", _transaction);
             const gasLimit = await this.provider.estimateGas(_transaction);
             _transaction = { ..._transaction, gasLimit };
+            console.log("formatTransaction _transaction2: ", _transaction);
 
             if (_transaction) {
               console.log("formatTransaction: ", _transaction);
