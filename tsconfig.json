@@ -1,19 +1,21 @@
 {
-  "ts-node": {
-    "files": true
-  },
   "compilerOptions": {
-    "target": "ES6",
-    "module": "ESNext",
+    "module": "commonjs",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2021",
+    "sourceMap": true,
     "outDir": "./dist",
-    "rootDir": "./src",
-    "strict": true,
-    "esModuleInterop": true,
+    "baseUrl": "./",
+    "incremental": true,
     "skipLibCheck": true,
-    "allowJs": true,
-    "checkJs": true,
-    "moduleResolution": "Node"
-  },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules"]
+    "strictNullChecks": false,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "forceConsistentCasingInFileNames": false,
+    "noFallthroughCasesInSwitch": false
+  }
 }
