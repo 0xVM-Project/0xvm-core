@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: '0xvm-core',
-      script: './dist/index.js',
+      script: './dist/main.js',
       args: '',
       instances: 1,
       autorestart: true,
