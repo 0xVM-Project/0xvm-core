@@ -1,0 +1,12 @@
+namespace Zxvm;
+
+table Data {
+  action:int;
+  data:string;
+}
+
+table Transaction {
+  content:[Data];
+}
+
+root_type Transaction;
