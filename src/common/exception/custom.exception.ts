@@ -8,4 +8,10 @@ export class WithdrawRequestException extends BaseCustomException {
     }
 }
 
+export class HashMappingException extends BaseCustomException {
+    constructor(message: string = ErrorCodes.WITHDRAW_REQUEST_ERROR.message) {
+        super(message, ErrorCodes.HASH_MAPPING_ERROR.code, HttpStatus.OK);
+    }
+}
+
 // todo: Other specific exception classes...

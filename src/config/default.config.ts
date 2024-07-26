@@ -1,9 +1,10 @@
 import { registerAs } from '@nestjs/config'
+import { removeTrailingSlash } from 'src/utils/http'
 
 export default registerAs('defalut', () => ({
     port: process.env.NEST_APP_PORT,
     xvm: {
-        xvmRpcUrl: process.env.XVM_RPC_URL,
+        xvmRpcUrl: removeTrailingSlash(process.env.XVM_RPC_URL),
         xvmNetwork: process.env.XVM_NETWORK,
         xvmChainId: parseInt(process.env.XVM_CHAIN_ID, 10) || 42,
         firstInscriptionBlockHeight: parseInt(process.env.FIRST_INSCRIPTION_BLOCK_HEIGHT, 10) || 0,
@@ -12,14 +13,14 @@ export default registerAs('defalut', () => ({
         sysXvmAddress: process.env.SYS_XVM_ADDRESS,
     },
     bitcoind: {
-        bitcoinRpcUrl: process.env.BITCOIN_RPC_URL,
+        bitcoinRpcUrl: removeTrailingSlash(process.env.BITCOIN_RPC_URL),
         bitcoinRpcUser: process.env.BITCOIN_RPC_USER,
         bitcoinRpcPassword: process.env.BITCOIN_RPC_PASSWORD,
     },
     ordinals: {
-        ordUrl:  process.env.ORD_URL
+        ordUrl: removeTrailingSlash(process.env.ORD_URL)
     },
     wallet: {
-        walletApiUrl: process.env.WALLET_API_URL
+        walletApiUrl: removeTrailingSlash(process.env.WALLET_API_URL)
     }
 }))

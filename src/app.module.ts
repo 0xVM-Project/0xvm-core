@@ -7,16 +7,20 @@ import { AppService } from './app.service';
 import { CommonModule } from './common/common.module';
 import { PipesModule } from './common/pipes/pipes.module';
 import { ToolsModule } from './tools/tools.module';
-import { TransactionModule } from './transaction/transaction.module';
-import { InscriptionModule } from './inscription/inscription.module';
+import { IndexerModule } from './indexer/indexer.module';
+import { XvmModule } from './xvm/xvm.module';
+import { CoreModule } from './core/core.module';
+import { TaskModule } from './task/task.module';
 
 @Module({
   imports: [
     CommonModule,
     PipesModule,
     ToolsModule,
-    TransactionModule,
-    InscriptionModule,
+    IndexerModule,
+    XvmModule,
+    CoreModule,
+    TaskModule,
   ],
   controllers: [AppController,],
   providers: [
