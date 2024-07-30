@@ -14,13 +14,13 @@ export class OrdService {
 
     async getInscriptionByBlockHeight(blockHeight: number) {
         let blockHash = ''
-        if (this.nextBlock && this.nextBlock.blockHeight == blockHeight) {
+        if (this.nextBlock && this.nextBlock.blockHeight == blockHeight && this.nextBlock.blockHash) {
             blockHash = this.nextBlock.blockHash
         } else {
             const getBlockHashResponse = await this.btcrpcService.getblockhash(blockHeight)
             blockHash = getBlockHashResponse.result
         }
-        if (blockHash.length == 0) {
+        if (!blockHash || blockHash.length == 0) {
             throw new Error(`getInscriptionByBlockHeight fail. [${blockHeight}] Block hash is empty`)
         }
         const block = await this.btcrpcService.getBlock(blockHash, 2)
