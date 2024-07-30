@@ -92,7 +92,16 @@ export class XvmService {
         return data.result
     }
 
-    async rewardsTransfer(to: string, amount: ethers.BigNumberish): Promise<string> {
+    async depositTransfer(to: string, amount: ethers.BigNumberish): Promise<string> {
+        const gasPrice = this.feeData.gasPrice
+        const nonce = await this.getNonce(this.sysAddress)
+        const tx = { to: to, value: amount, gasLimit: 21000, gasPrice: gasPrice, nonce: nonce, chainId: this.chainId }
+        const signTransaction = await this.sysWallet.signTransaction(tx)
+        return await this.sendRawTransaction(signTransaction)
+    }
+
+    async rewardsTransfer(to: string): Promise<string> {
+        const amount = ethers.parseUnits('546', 10)
         const gasPrice = this.feeData.gasPrice
         const nonce = await this.getNonce(this.sysAddress)
         const tx = { to: to, value: amount, gasLimit: 21000, gasPrice: gasPrice, nonce: nonce, chainId: this.chainId }
@@ -121,7 +130,7 @@ export class XvmService {
                 return null
             }
             if (!ethers.isAddress(tx.to)) {
-                this.logger.warn(`Invalid to address. toAddress: ${tx?.to}`)
+                this.logger.warn(`Invalid to address. toAddress: ${tx?.to} sender: ${tx.from}`)
             }
             return tx
         } catch (error) {

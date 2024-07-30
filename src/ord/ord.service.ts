@@ -1,11 +1,14 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Inscription, InscriptionService } from "./inscription.service";
 import { BtcrpcService } from "src/common/api/btcrpc/btcrpc.service";
+import { TxOutput } from "src/common/api/btcrpc/btcrpc.interface";
+import { CoreService } from "src/core/core.service";
 
 @Injectable()
 export class OrdService {
     private readonly logger = new Logger(InscriptionService.name)
     private nextBlock: { blockHeight: number, blockHash: string }
+    private outputFor0xvm: Record<string, TxOutput[]> = {}
 
     constructor(
         private readonly ordService: InscriptionService,
@@ -34,12 +37,26 @@ export class OrdService {
             const inscription = this.ordService.getInscriptionContentData(tx.txid, tx.vin[0].txinwitness)
             if (inscription) {
                 inscriptionList.push(inscription)
+                this.outputFor0xvm[tx.txid] = tx.vout
             }
         }
         return {
             inscriptionList: inscriptionList,
             nextblockhash: nextblockhash,
             blockTimestamp: time
+        }
+    }
+
+    async getInscriptionTxOutput(txid: string, index = 1): Promise<TxOutput | null> {
+        if (this.outputFor0xvm && txid in this.outputFor0xvm && this.outputFor0xvm[txid].length > index) {
+            return this.outputFor0xvm[txid].at(index)
+        } else {
+            const { result } = await this.btcrpcService.getRawtransaction(txid)
+            const vout = result.vout
+            if (vout.length < index + 1) {
+                return null
+            }
+            return result.vout[index]
         }
     }
 }

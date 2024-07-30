@@ -23,6 +23,41 @@ export interface BlockchainInfoResponse extends BtcBaseResponse<BlockchainInfo> 
     result: BlockchainInfo
 }
 
+export interface TxInput {
+    coinbase: string,
+    txinwitness: Array<string>,
+    sequence: number
+}
+
+export interface TxOutput {
+    value: number,
+    n: number,
+    scriptPubKey: {
+        asm: string,
+        desc: string,
+        hex: string,
+        address: string,
+        type: string
+    }
+}
+
+export interface Transaction {
+    txid: string,
+    hash: string,
+    version: number,
+    size: number,
+    vsize: number,
+    weight: number,
+    locktime: number,
+    vin: Array<TxInput>,
+    vout: Array<TxOutput>,
+    hex: string,
+    blockhash: string,
+    confirmations: number,
+    time: number,
+    blocktime: number
+}
+
 interface Block {
     hash: string,
     confirmations: number,
@@ -50,26 +85,16 @@ interface Block {
         vsize: number,
         weight: number,
         locktime: number,
-        vin: Array<{
-            coinbase: string,
-            txinwitness: Array<string>,
-            sequence: number
-        }>,
-        vout: Array<{
-            value: number,
-            n: number,
-            scriptPubKey: {
-                asm: string,
-                desc: string,
-                hex: string,
-                address: string,
-                type: string
-            }
-        }>,
+        vin: Array<TxInput>,
+        vout: Array<TxOutput>,
         hex: string
     }>
 }
 
 export interface BlockResponse extends BtcBaseResponse<Block> {
     result: Block
+}
+
+export interface RawTransactionResponse extends BtcBaseResponse<Transaction> {
+    result: Transaction
 }

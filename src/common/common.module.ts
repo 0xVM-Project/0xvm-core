@@ -18,6 +18,13 @@ import { ApiModule } from './api/api.module';
         MysqlModule,
         InterceptorModule,
         ApiModule,
+    ],
+    exports: [
+        ConfigModule,
+        AxiosModule,
+        MysqlModule,
+        InterceptorModule,
+        ApiModule
     ]
 })
 export class CommonModule { }

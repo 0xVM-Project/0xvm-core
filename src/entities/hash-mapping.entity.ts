@@ -1,5 +1,4 @@
-import { hash160 } from 'bitcoinjs-lib/src/crypto';
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Unique, Index } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 
 @Entity('hash_mapping')
 @Index('idx_btcHash_and_idx_xvmHash',['btcHash', 'xvmHash'], { unique: true })

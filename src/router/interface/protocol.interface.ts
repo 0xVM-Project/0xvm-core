@@ -1,5 +1,3 @@
-import { InscriptionType } from "../../indexer/indexer.interface"
-
 export interface BaseCommandsType {
     action: number
 }
