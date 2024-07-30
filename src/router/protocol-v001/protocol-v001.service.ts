@@ -53,7 +53,7 @@ export class ProtocolV001Service implements IProtocol<Inscription, CommandsV1Typ
         let xvmFrom: string = ''
         let xvmTo: string = ''
         let logIndex: number = 0
-        const inscriptionHash = inscription.inscriptionId.slice(0, -2)
+        const inscriptionHash = `0x${inscription.inscriptionId.slice(0, -2)}`
         // command list
         for (const inscriptionCommand of inscriptionCommandList) {
             const headers = {
