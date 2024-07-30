@@ -4,7 +4,7 @@ import { ConfigType } from '@nestjs/config';
 import { AxiosRequestConfig } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import defaultConfig from 'src/config/default.config';
-import { BlockchainInfoResponse, BlockResponse, BtcBaseResponse } from './btcrpc.interface';
+import { BlockchainInfoResponse, BlockResponse, BtcBaseResponse, RawTransactionResponse } from './btcrpc.interface';
 
 @Injectable()
 export class BtcrpcService {
@@ -55,6 +55,11 @@ export class BtcrpcService {
 
     async getBlockToHex(blockHash: string) {
         const { data } = await this.client<BtcBaseResponse<string>>('getblock', [blockHash, 0])
+        return data
+    }
+
+    async getRawtransaction(txid: string) {
+        const { data } = await this.client<RawTransactionResponse>('getrawtransaction', [txid, 1])
         return data
     }
 }

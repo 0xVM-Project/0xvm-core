@@ -8,16 +8,18 @@ import dbMysqlConfig from 'src/config/db-mysql.config';
         TypeOrmModule.forRootAsync({
             imports: [ConfigModule],
             inject: [dbMysqlConfig.KEY],
-            useFactory: async (config: ConfigType<typeof dbMysqlConfig>) => ({
-                type: 'mysql',
-                host: config.host,
-                port: config.port,
-                username: config.username,
-                password: config.password,
-                database: config.database,
-                entities: config.entities,
-                synchronize: config.synchronize
-            }),
+            useFactory: async (config: ConfigType<typeof dbMysqlConfig>) => {
+                return {
+                    type: 'mysql',
+                    host: config.host,
+                    port: config.port,
+                    username: config.username,
+                    password: config.password,
+                    database: config.database,
+                    entities: config.entities,
+                    synchronize: config.synchronize
+                }
+            },
         }),
     ]
 })

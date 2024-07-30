@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { IProtocol } from './router.interface';
 
 @Injectable()
-export class ProtNotValidService implements IProtocol<any, any, any, any> {
+export class ProtNotValidService implements IProtocol<any, any> {
     filterInscription(ordiInscriptionsContent: any) {
         return null
     }

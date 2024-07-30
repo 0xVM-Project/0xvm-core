@@ -34,6 +34,6 @@ describe('CoreService', () => {
   });
 
   it('process block', async () => {
-    await service.processBlock(2865305)
+    await service.processBlock(2865732)
   })
 });

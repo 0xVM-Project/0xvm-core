@@ -18,7 +18,7 @@ export class RouterService {
         }
     }
     
-    from(inscriptionContent: string): IProtocol<any, any, any, any> {
+    from(inscriptionContent: string): IProtocol<any, any> {
         const version = inscriptionContent.slice(0, 6)
         if (version in this.handlers) {
             return this.handlers[version]

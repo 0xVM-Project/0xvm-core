@@ -1,7 +1,7 @@
-export interface IProtocol<I, BaseCommandsInterface, InscriptionType, T> {
+export interface IProtocol<I, C> {
     filterInscription(ordiInscriptionsContent: I): I | null
-    decodeInscription(inscriptionContent: string): Array<BaseCommandsInterface>
-    executeTransaction(inscription: InscriptionType): Promise<Array<string>>
+    decodeInscription(inscriptionContent: string): Array<C>
+    executeTransaction(inscription: I): Promise<Array<string>>
 
     /** protocol action
     **  deploy = 1,
@@ -11,9 +11,9 @@ export interface IProtocol<I, BaseCommandsInterface, InscriptionType, T> {
     **  withdraw = 5
     */
 
-    deploy(data: T, inscription: InscriptionType): Promise<string>
-    execute(data: T, inscription: InscriptionType): Promise<string>
-    transfer(data: T, inscription: InscriptionType): Promise<string>
-    deposit(data: T, inscription: InscriptionType): Promise<string>
-    withdraw(data: T, inscription: InscriptionType): Promise<string>
+    deploy(data: string, inscription: I): Promise<string>
+    execute(data: string, inscription: I): Promise<string>
+    transfer(data: string, inscription: I): Promise<string>
+    deposit(data: string, inscription: I): Promise<string>
+    withdraw(data: string, inscription: I): Promise<string>
 }

@@ -1,6 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ProtocolVersionEnum } from '../router.enum';
-import { InscriptionType } from '../../indexer/indexer.interface';
 import { IProtocol } from '../router.interface';
 import { CommandsV1Type } from '../interface/protocol.interface'
 import { InscriptionActionEnum } from 'src/indexer/indexer.enum';
@@ -14,23 +13,24 @@ import defaultConfig from 'src/config/default.config';
 import { ConfigType } from '@nestjs/config';
 import { HashMappingService } from './hash-mapping/hash-mapping.service';
 import { OrdinalsService } from 'src/common/api/ordinals/ordinals.service';
-import { error } from 'console';
+import { OrdService } from 'src/ord/ord.service';
+import { Inscription } from 'src/ord/inscription.service';
 
 
 @Injectable()
-export class ProtocolV001Service implements IProtocol<InscriptionType, CommandsV1Type, InscriptionType, String> {
+export class ProtocolV001Service implements IProtocol<Inscription, CommandsV1Type> {
     private readonly logger = new Logger(ProtocolV001Service.name)
     public readonly version = ProtocolVersionEnum['0f0001']
 
     constructor(
         @Inject(defaultConfig.KEY) private readonly defaultConf: ConfigType<typeof defaultConfig>,
-        private readonly ordinalsService: OrdinalsService,
         private readonly xvmService: XvmService,
         private readonly withdrawService: WithdrawService,
         private readonly hashMappingService: HashMappingService,
+        private readonly ordService: OrdService,
     ) { }
 
-    filterInscription(ordiInscriptionsContent: InscriptionType): InscriptionType | null {
+    filterInscription(ordiInscriptionsContent: Inscription): Inscription | null {
         return ordiInscriptionsContent.content.startsWith(this.version) ? ordiInscriptionsContent : null
     }
 
@@ -40,9 +40,13 @@ export class ProtocolV001Service implements IProtocol<InscriptionType, CommandsV
         return this.flatbuffersDecode(base64Decode)
     }
 
-    async executeTransaction(inscription: InscriptionType): Promise<Array<string>> {
+    async executeTransaction(inscription: Inscription): Promise<Array<string>> {
         if (!inscription?.content || !inscription?.inscriptionId) {
             throw new Error(`Inscription content or inscription id cannot be empty`)
+        }
+        // ba6307750d57b99a5ffa0bac2b1fd7efc5953d8f094bf56bcbd298c5e621a61bi0
+        if (inscription.inscriptionId.length != 66) {
+            throw new Error(`Invalid inscription id, length must be 64, currently ${inscription.inscriptionId?.length}`)
         }
         const transactionHash: string[] = []
         const inscriptionCommandList = this.decodeInscription(inscription.content)
@@ -89,7 +93,7 @@ export class ProtocolV001Service implements IProtocol<InscriptionType, CommandsV
         }
         // inscription rewards
         const toRewards = xvmFrom
-        const hash = await this.xvmService.rewardsTransfer(toRewards, ethers.parseUnits('546', 8)).catch(error => {
+        const hash = await this.xvmService.rewardsTransfer(toRewards).catch(error => {
             throw new Error(`inscription rewards fail. sysAddress: ${this.xvmService.sysAddress} to: ${toRewards} inscriptionId: ${inscription.inscriptionId}\n ${error?.stack}`)
         })
         if (hash) {
@@ -107,33 +111,37 @@ export class ProtocolV001Service implements IProtocol<InscriptionType, CommandsV
         return transactionHash
     }
 
-    async deploy(data: string, inscription: InscriptionType) {
+    async deploy(data: string, inscription: Inscription) {
         return await this.xvmService.sendRawTransaction(data)
     }
 
-    async execute(data: string, inscription: InscriptionType): Promise<string> {
+    async execute(data: string, inscription: Inscription): Promise<string> {
         return await this.xvmService.sendRawTransaction(data)
     }
 
-    async transfer(data: string, inscription: InscriptionType): Promise<string> {
+    async transfer(data: string, inscription: Inscription): Promise<string> {
         return await this.xvmService.sendRawTransaction(data)
     }
 
-    async deposit(data: string, inscription: InscriptionType): Promise<string> {
-        const inscriptionId = inscription.inscriptionId
-        const outputResponse = await this.ordinalsService.getOutputById(inscriptionId, 1)
-        const { address, value } = outputResponse.data
-        // If the deposit address is not the system address, the deposit is invalid.
+    async deposit(data: string, inscription: Inscription): Promise<string> {
         const unsingTransaction = this.xvmService.unSignTransaction(data)
         const to = unsingTransaction.from
-        if (this.defaultConf.xvm.sysBtcAddress == address) {
-            return await this.xvmService.rewardsTransfer(to, value)
+        const txid = inscription.inscriptionId.slice(0, -2)
+        const depositOutput = await this.ordService.getInscriptionTxOutput(txid, 1)
+        if (!depositOutput) {
+            this.logger.warn(`Invalid deposit. No deposit funds were sent. inscriptionId:${inscription.inscriptionId} sender:${unsingTransaction.from} inscriptionId:${inscription.inscriptionId}`)
+            return null
         }
-        this.logger.warn(`Invalid deposit. Invalid funds deposit address. sender:${unsingTransaction.from}  deposit system address:${address}`)
-        return null
+        const { scriptPubKey: { address }, value } = depositOutput
+        // If the deposit address is not the system address, the deposit is invalid.
+        if (this.defaultConf.xvm.sysBtcAddress != address) {
+            this.logger.warn(`Invalid deposit. Invalid funds deposit address. inscriptionId:${inscription.inscriptionId} sender:${unsingTransaction.from}  deposit system address:${address}`)
+            return null
+        }
+        return await this.xvmService.depositTransfer(to, ethers.parseEther(value.toString()))
     }
 
-    async withdraw(data: string, inscription: InscriptionType): Promise<string> {
+    async withdraw(data: string, inscription: Inscription): Promise<string> {
         const unsingTransaction = this.xvmService.unSignTransaction(data)
         // Deduction of xBTC balance
         const hash = await this.xvmService.sendRawTransaction(data)
