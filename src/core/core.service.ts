@@ -12,20 +12,29 @@ export class CoreService {
     private readonly logger = new Logger(CoreService.name)
     private readonly firstInscriptionBlockHeight: number
     private readonly retryCount: number = 6
+    private latestBlockHeightForBtc: number
+    private latestBlockHeightForXvm: number
+    private diffBlock: number
 
     constructor(
         @Inject(defaultConfig.KEY) private readonly defaultConf: ConfigType<typeof defaultConfig>,
         private readonly indexerService: IndexerService,
         private readonly routerService: RouterService,
         private readonly xvmService: XvmService,
-        private readonly ordinalsService: OrdinalsService,
     ) {
         this.firstInscriptionBlockHeight = this.defaultConf.xvm.firstInscriptionBlockHeight
+        this.indexerService.getLatestBlockNumberForBtc()
+            .then(latestBlockHeight => this.latestBlockHeightForBtc = latestBlockHeight)
+            .catch(error => { throw error })
     }
 
     async processBlock(blockHeight: number) {
         this.xvmService.initNonce()
-        const inscriptionList = await this.indexerService.fetchInscription0xvmByBlock(blockHeight)
+        const { inscriptionList, allInscriptionCount } = await this.indexerService.fetchInscription0xvmByBlock(blockHeight)
+        const remainingBlock = this.latestBlockHeightForBtc - blockHeight - 1
+        const progressRate = Number(blockHeight / this.latestBlockHeightForBtc * 100).toFixed(2)
+        const message = `Block [${blockHeight}/${this.latestBlockHeightForBtc}] Total:${allInscriptionCount} 0xvm:${inscriptionList.length} RemainingBlock:${remainingBlock} Progress:${progressRate}%`
+        this.logger.log(message)
         const hashList: string[] = []
         for (let index = 0; index < inscriptionList.length; index++) {
             const inscription = inscriptionList[index];
@@ -39,19 +48,18 @@ export class CoreService {
     }
 
     async run() {
-        let btcLatestBlockNumber: number = await this.indexerService.getLatestBlockNumberForBtc()
-        let xvmLatestBlockNumber: number = await this.xvmService.getLatestBlockNumber()
-        let ordinalsBlockNumber: number = await this.ordinalsService.getBlockheight()
+        this.latestBlockHeightForBtc = await this.indexerService.getLatestBlockNumberForBtc()
+        this.latestBlockHeightForXvm = await this.xvmService.getLatestBlockNumber()
         // init xvm block, Skip blocks without oxvm protocol inscriptions high
-        while (xvmLatestBlockNumber < this.firstInscriptionBlockHeight) {
-            if (xvmLatestBlockNumber >= btcLatestBlockNumber) {
+        while (this.latestBlockHeightForXvm < this.firstInscriptionBlockHeight) {
+            if (this.latestBlockHeightForXvm >= this.latestBlockHeightForBtc) {
                 break
             }
-            xvmLatestBlockNumber += 1
+            this.latestBlockHeightForXvm += 1
             // create block
             await this.xvmService.minterBlock()
-            if (xvmLatestBlockNumber % 1000 == 0 || xvmLatestBlockNumber == this.firstInscriptionBlockHeight) {
-                this.logger.log(`Skip Block Progress ${xvmLatestBlockNumber}/${this.firstInscriptionBlockHeight}  ${Number(xvmLatestBlockNumber / this.firstInscriptionBlockHeight * 100).toFixed(4)}%`)
+            if (this.latestBlockHeightForXvm % 1000 == 0 || this.latestBlockHeightForXvm == this.firstInscriptionBlockHeight) {
+                this.logger.log(`Skip Block Progress ${this.latestBlockHeightForXvm}/${this.firstInscriptionBlockHeight}  ${Number(this.latestBlockHeightForXvm / this.firstInscriptionBlockHeight * 100).toFixed(4)}%`)
             }
         }
         let retryTotal = 0
@@ -61,15 +69,15 @@ export class CoreService {
                     this.logger.warn(`Retry failed several times, please manually process`)
                     break
                 }
-                btcLatestBlockNumber = await this.indexerService.getLatestBlockNumberForBtc()
-                xvmLatestBlockNumber = await this.xvmService.getLatestBlockNumber()
-                ordinalsBlockNumber = await this.ordinalsService.getBlockheight()
-                const currentBlockNumber = xvmLatestBlockNumber == 0 ? xvmLatestBlockNumber : xvmLatestBlockNumber + 1
-                if ((ordinalsBlockNumber > 0 && currentBlockNumber > ordinalsBlockNumber) || currentBlockNumber > btcLatestBlockNumber) {
-                    this.logger.log(`[${currentBlockNumber}/${btcLatestBlockNumber}] Waiting for new blocks`)
+                this.latestBlockHeightForBtc = await this.indexerService.getLatestBlockNumberForBtc()
+                this.latestBlockHeightForXvm = await this.xvmService.getLatestBlockNumber()
+                this.diffBlock = this.latestBlockHeightForBtc - this.latestBlockHeightForXvm
+                if (this.diffBlock <= 0) {
+                    this.logger.log(`[${this.latestBlockHeightForXvm}/${this.latestBlockHeightForBtc}] Waiting for new blocks`)
                     await sleep(10000)
                     continue
                 }
+                const currentBlockNumber = this.latestBlockHeightForXvm == 0 ? this.latestBlockHeightForXvm : this.latestBlockHeightForXvm + 1
                 await this.processBlock(currentBlockNumber)
                 retryTotal = 0
             } catch (error) {
