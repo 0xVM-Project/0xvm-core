@@ -11,6 +11,7 @@ import { IndexerModule } from './indexer/indexer.module';
 import { XvmModule } from './xvm/xvm.module';
 import { CoreModule } from './core/core.module';
 import { TaskModule } from './task/task.module';
+import { OrdModule } from './ord/ord.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { TaskModule } from './task/task.module';
     XvmModule,
     CoreModule,
     TaskModule,
+    OrdModule,
   ],
   controllers: [AppController,],
   providers: [

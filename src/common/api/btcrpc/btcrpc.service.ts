@@ -4,7 +4,7 @@ import { ConfigType } from '@nestjs/config';
 import { AxiosRequestConfig } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import defaultConfig from 'src/config/default.config';
-import { BtcBlockchainInfo } from './btcrpc.interface';
+import { BlockchainInfoResponse, BlockResponse, BtcBaseResponse } from './btcrpc.interface';
 
 @Injectable()
 export class BtcrpcService {
@@ -13,10 +13,15 @@ export class BtcrpcService {
 
     constructor(
         private readonly httpService: HttpService,
-    ){}
+    ) { }
 
-    async getBlockchainInfoForBtc() {
-        const url = this.defaultConf.bitcoind.bitcoinRpcUrl
+    private async client<T>(rpcMethod: string, params: any[]) {
+        const payload = {
+            "jsonrpc": "1.0",
+            "id": "curltest",
+            "method": rpcMethod,
+            "params": params
+        }
         const config: AxiosRequestConfig = {
             headers: {
                 'content-type': 'application/json'
@@ -24,15 +29,32 @@ export class BtcrpcService {
             auth: {
                 username: this.defaultConf.bitcoind.bitcoinRpcUser,
                 password: this.defaultConf.bitcoind.bitcoinRpcPassword
-            }
+            },
+            method: 'POST',
+            baseURL: this.defaultConf.bitcoind.bitcoinRpcUrl,
+            data: payload
         }
-        const payload = {
-            "jsonrpc": "1.0",
-            "id": "curltest",
-            "method": "getblockchaininfo",
-            "params": []
-        }
-        const response = await firstValueFrom(this.httpService.post<BtcBlockchainInfo>(url, payload, config))
-        return response.data
+
+        return await firstValueFrom(this.httpService.request<T>(config))
+    }
+
+    async getBlockchainInfoForBtc() {
+        const { data } = await this.client<BlockchainInfoResponse>('getblockchaininfo', [])
+        return data
+    }
+
+    async getblockhash(blockHeight: number) {
+        const { data } = await this.client<BtcBaseResponse<string>>('getblockhash', [blockHeight])
+        return data
+    }
+
+    async getBlock(blockHash: string, verbosity: 0 | 1 | 2 = 2) {
+        const { data } = await this.client<BlockResponse>('getblock', [blockHash, verbosity])
+        return data
+    }
+
+    async getBlockToHex(blockHash: string) {
+        const { data } = await this.client<BtcBaseResponse<string>>('getblock', [blockHash, 0])
+        return data
     }
 }

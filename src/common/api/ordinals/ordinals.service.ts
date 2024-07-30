@@ -5,6 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import defaultConfig from 'src/config/default.config';
 import { OrdiInscriptionsBlockType, OrdiOutputType } from './ordinals.interface';
 import { AxiosRequestConfig } from 'axios';
+import { BtcrpcService } from '../btcrpc/btcrpc.service';
 
 @Injectable()
 export class OrdinalsService {
