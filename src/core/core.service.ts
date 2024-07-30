@@ -32,7 +32,7 @@ export class CoreService {
         this.xvmService.initNonce()
         const { inscriptionList, allInscriptionCount } = await this.indexerService.fetchInscription0xvmByBlock(blockHeight)
         const remainingBlock = this.latestBlockHeightForBtc - (blockHeight - 1)
-        const progressRate = Number((blockHeight - 1) / this.latestBlockHeightForBtc * 100).toFixed(2)
+        const progressRate = Math.floor((blockHeight - 1) / this.latestBlockHeightForBtc * 10000) / 100
         const message = `Block [${blockHeight}/${this.latestBlockHeightForBtc}] Total:${allInscriptionCount} 0xvm:${inscriptionList.length} RemainingBlock:${remainingBlock} Progress:${progressRate}%`
         this.logger.log(message)
         const hashList: string[] = []
