@@ -4,7 +4,7 @@ import { ConfigType } from '@nestjs/config';
 import { Transaction, ethers } from 'ethers';
 import defaultConfig from 'src/config/default.config';
 import { firstValueFrom } from 'rxjs';
-import { XvmRpcBaseResponse, XvmRpcEngineCreateBlockResponse } from './xvm.interface';
+import { EvmMineBlockResponse, EvmRevertBlockResponse, XvmRpcBaseResponse, XvmRpcEngineCreateBlockResponse } from './xvm.interface';
 
 @Injectable()
 export class XvmService {
@@ -109,9 +109,32 @@ export class XvmService {
         return await this.sendRawTransaction(signTransaction)
     }
 
-    async minterBlock() {
-        const response = await this.rpcClient<XvmRpcEngineCreateBlockResponse>('engine_createBlock', [true, true, null])
-        return response.data.result.hash
+    async minterBlock(timestamp: number) {
+        const response = await this.rpcClient<EvmMineBlockResponse>('evm_mine_block', [{ timestamp: timestamp }])
+        if ('error' in response.data) {
+            throw new Error(`Minter Block fail. error: ${JSON.stringify(response.data.error)}`)
+        }
+        return response.data.result
+    }
+
+    /**
+     * Restore to the current block, all subsequent block data will be discarded
+     * @param blockHeight Restore data to the current block height
+     * @returns Resume execution status, true: success, false: failure
+     * @example
+     * // revert block: 30
+     * // latest block: 31
+     * // After successful execution
+     * // block 30
+     * //  ̶b̶l̶o̶c̶k̶ ̶3̶1̶
+     * // After the recovery is successfully executed, the block information after block height 30 will be discarded
+     */
+    async revertBlock(blockHeight: number): Promise<boolean> {
+        const response = await this.rpcClient<EvmRevertBlockResponse>('evm_revert_block', [`0x${blockHeight.toString(16)}`])
+        if ('error' in response.data) {
+            throw new Error(`Revert Block [${blockHeight}] fail. error: ${JSON.stringify(response.data.error)}`)
+        }
+        return response.data.result
     }
 
     unSignTransaction(signTransaction: string): Transaction | null {

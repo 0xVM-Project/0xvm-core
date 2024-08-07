@@ -22,11 +22,11 @@ export class IndexerService {
         return blocks
     }
 
-    async fetchInscription0xvmByBlock(blockHeight: string | number): Promise<{ inscriptionList: Inscription[], nextBlockHash: string, allInscriptionCount: number }> {
+    async fetchInscription0xvmByBlock(blockHeight: string | number): Promise<{ inscriptionList: Inscription[], nextBlockHash: string, blockHash: string, allInscriptionCount: number, blockTimestamp: number }> {
         if (Number.isNaN(blockHeight)) {
             throw new Error(`blockHeight cannot be nan`)
         }
-        const { inscriptionList, nextblockhash, blockTimestamp } = await this.ordService.getInscriptionByBlockHeight(Number(blockHeight))
+        const { inscriptionList, nextblockhash, blockTimestamp, blockHash } = await this.ordService.getInscriptionByBlockHeight(Number(blockHeight))
 
         const allInscriptionCount = inscriptionList.length
         const inscriptionFor0xvmList: Array<Inscription> = []
@@ -48,7 +48,9 @@ export class IndexerService {
         return {
             inscriptionList: inscriptionFor0xvmList,
             nextBlockHash: nextblockhash,
-            allInscriptionCount: allInscriptionCount
+            blockHash: blockHash,
+            allInscriptionCount: allInscriptionCount,
+            blockTimestamp: blockTimestamp
         }
     }
 }

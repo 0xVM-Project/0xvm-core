@@ -4,7 +4,7 @@ import { RouterModule } from './router.module';
 import { IndexerModule } from 'src/indexer/indexer.module';
 import { IndexerService } from 'src/indexer/indexer.service';
 import { CommonModule } from 'src/common/common.module';
-import { ProtocolV001Module } from './protocol-v001/protocol-v001.module';
+import { ProtocolV001Module } from './protocol/protocol-v001.module';
 import { MysqlModule } from 'src/common/mysql/mysql.module';
 
 describe('ProtocolService', () => {

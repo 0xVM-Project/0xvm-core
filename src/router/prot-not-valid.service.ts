@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { IProtocol } from './router.interface';
+import { ProtocolBase } from './protocol/protocol-base';
 
 @Injectable()
-export class ProtNotValidService implements IProtocol<any, any> {
+export class ProtNotValidService extends ProtocolBase<any, any> {
     filterInscription(ordiInscriptionsContent: any) {
         return null
     }
