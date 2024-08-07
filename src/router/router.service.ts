@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ProtocolVersionEnum } from './router.enum';
-import { ProtocolV001Service } from './protocol-v001/protocol-v001.service';
+import { ProtocolV001Service } from './protocol/protocol-v001.service';
 import { ProtNotValidService as NotValidProtocolService } from './prot-not-valid.service';
 import { IProtocol } from './router.interface';
 

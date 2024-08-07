@@ -43,6 +43,7 @@ export class OrdService {
         return {
             inscriptionList: inscriptionList,
             nextblockhash: nextblockhash,
+            blockHash: blockHash,
             blockTimestamp: time
         }
     }

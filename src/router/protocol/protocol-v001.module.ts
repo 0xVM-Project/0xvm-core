@@ -5,9 +5,12 @@ import { HashMappingModule } from './hash-mapping/hash-mapping.module';
 import { XvmModule } from 'src/xvm/xvm.module';
 import { OrdinalsModule } from 'src/common/api/ordinals/ordinals.module';
 import { OrdModule } from 'src/ord/ord.module';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { BlockHashSnapshot } from 'src/entities/block-snapshot.entity';
 
 @Module({
     imports: [
+        TypeOrmModule.forFeature([BlockHashSnapshot]),
         WithdrawModule,
         HashMappingModule,
         XvmModule,

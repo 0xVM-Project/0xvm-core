@@ -1,6 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ProtocolVersionEnum } from '../router.enum';
-import { IProtocol } from '../router.interface';
 import { CommandsV1Type } from '../interface/protocol.interface'
 import { InscriptionActionEnum } from 'src/indexer/indexer.enum';
 import * as Flatbuffers from "./flatbuffers/output/zxvm";
@@ -12,13 +11,14 @@ import { IWithdraw } from './withdraw/withdraw.interface';
 import defaultConfig from 'src/config/default.config';
 import { ConfigType } from '@nestjs/config';
 import { HashMappingService } from './hash-mapping/hash-mapping.service';
-import { OrdinalsService } from 'src/common/api/ordinals/ordinals.service';
 import { OrdService } from 'src/ord/ord.service';
 import { Inscription } from 'src/ord/inscription.service';
+import { ProtocolBase } from './protocol-base';
+import { BtcrpcService } from 'src/common/api/btcrpc/btcrpc.service';
 
 
 @Injectable()
-export class ProtocolV001Service implements IProtocol<Inscription, CommandsV1Type> {
+export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Type> {
     private readonly logger = new Logger(ProtocolV001Service.name)
     public readonly version = ProtocolVersionEnum['0f0001']
 
@@ -28,7 +28,10 @@ export class ProtocolV001Service implements IProtocol<Inscription, CommandsV1Typ
         private readonly withdrawService: WithdrawService,
         private readonly hashMappingService: HashMappingService,
         private readonly ordService: OrdService,
-    ) { }
+        private readonly btcrpcService: BtcrpcService,
+    ) {
+        super()
+    }
 
     filterInscription(ordiInscriptionsContent: Inscription): Inscription | null {
         return ordiInscriptionsContent.content.startsWith(this.version) ? ordiInscriptionsContent : null

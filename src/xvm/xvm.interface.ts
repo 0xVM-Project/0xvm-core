@@ -47,3 +47,13 @@ export interface EngineCreateBlock {
 export interface XvmRpcEngineCreateBlockResponse extends XvmRpcBaseResponse<EngineCreateBlock> {
     result: EngineCreateBlock
 }
+
+// evm_mine_block
+export interface EvmMineBlockResponse extends XvmRpcBaseResponse<string> {
+    result: string
+}
+
+// evm_revert_block
+export interface EvmRevertBlockResponse extends XvmRpcBaseResponse<boolean> {
+    result: boolean
+}
