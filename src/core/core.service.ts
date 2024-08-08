@@ -107,6 +107,8 @@ export class CoreService {
             const state = await this.xvmService.revertBlock(revertBlock.blockHeight - 1)
             if (state != true) {
                 throw new Error(`Revert Block [${revertBlock.blockHeight}] fail. `)
+            } else {
+                this.logger.log(`Revert Block [${revertBlock.blockHeight}] success. `)
             }
             await this.blockHashSnapshotRepository.delete({
                 blockHeight: MoreThanOrEqual(revertBlock.blockHeight)
