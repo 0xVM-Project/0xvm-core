@@ -57,3 +57,33 @@ export interface EvmMineBlockResponse extends XvmRpcBaseResponse<string> {
 export interface EvmRevertBlockResponse extends XvmRpcBaseResponse<boolean> {
     result: boolean
 }
+
+export interface XvmBlockByNumber {
+    hash: string,
+    parentHash: string,
+    sha3Uncles: string,
+    miner: string,
+    stateRoot: string,
+    transactionsRoot: string,
+    receiptsRoot: string,
+    logsBloom: string,
+    difficulty: string,
+    number: string,
+    gasLimit: string,
+    gasUsed: string,
+    timestamp: string,
+    totalDifficulty: string,
+    extraData: string,
+    mixHash: string,
+    nonce: string,
+    baseFeePerGas: string,
+    blobGasUsed: string,
+    excessBlobGas: string,
+    uncles: [],
+    transactions: [],
+    size: string
+}
+
+export interface EvmBlockByNumberResponse extends XvmRpcBaseResponse<XvmBlockByNumber> {
+    result: XvmBlockByNumber
+}

@@ -4,7 +4,7 @@ import { ConfigType } from '@nestjs/config';
 import { Transaction, ethers } from 'ethers';
 import defaultConfig from 'src/config/default.config';
 import { firstValueFrom } from 'rxjs';
-import { EvmMineBlockResponse, EvmRevertBlockResponse, XvmRpcBaseResponse, XvmRpcEngineCreateBlockResponse } from './xvm.interface';
+import { EvmBlockByNumberResponse, EvmMineBlockResponse, EvmRevertBlockResponse, XvmRpcBaseResponse, XvmRpcEngineCreateBlockResponse } from './xvm.interface';
 
 @Injectable()
 export class XvmService {
@@ -134,6 +134,11 @@ export class XvmService {
         if ('error' in response.data) {
             throw new Error(`Revert Block [${blockHeight}] fail. error: ${JSON.stringify(response.data.error)}`)
         }
+        return response.data.result
+    }
+
+    async getBlockByNumber(blockHeight: number) {
+        const response = await this.rpcClient<EvmBlockByNumberResponse>('eth_getBlockByNumber', [blockHeight, true])
         return response.data.result
     }
 

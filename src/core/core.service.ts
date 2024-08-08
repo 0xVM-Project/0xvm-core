@@ -121,6 +121,7 @@ export class CoreService {
         const { inscriptionList, allInscriptionCount, blockHash, blockTimestamp } = await this.indexerService.fetchInscription0xvmByBlock(blockHeight)
         const remainingBlock = this.latestBlockHeightForBtc - (blockHeight - 1)
         const progressRate = Math.floor((blockHeight - 1) / this.latestBlockHeightForBtc * 10000) / 100
+        this.logger.log(`⟱⟱⟱ ${blockHeight} ⟱⟱⟱`)
         const message = `Block [${blockHeight}/${this.latestBlockHeightForBtc}] Total:${allInscriptionCount} 0xvm:${inscriptionList.length} RemainingBlock:${remainingBlock} Progress:${progressRate}%`
         this.logger.log(message)
         const hashList: string[] = []
@@ -161,7 +162,7 @@ export class CoreService {
             skipMinterBlockTimestamp += 1
             if (this.latestBlockHeightForXvm % 1000 == 0 || this.latestBlockHeightForXvm == this.firstInscriptionBlockHeight) {
                 skipCostTimestamp = Date.now() - skipBlockStartTime
-                this.logger.log(`Skip Block Progress ${this.latestBlockHeightForXvm}/${this.firstInscriptionBlockHeight}  ${Number(this.latestBlockHeightForXvm / this.firstInscriptionBlockHeight * 100).toFixed(4)}%  cost time: ${skipCostTimestamp}ms(${skipCostTimestamp/1000}s)`)
+                this.logger.log(`Skip Block Progress ${this.latestBlockHeightForXvm}/${this.firstInscriptionBlockHeight}  ${Number(this.latestBlockHeightForXvm / this.firstInscriptionBlockHeight * 100).toFixed(4)}%  cost time: ${skipCostTimestamp}ms(${skipCostTimestamp / 1000}s)`)
                 skipBlockStartTime = Date.now()
             }
         }
