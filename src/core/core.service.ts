@@ -11,7 +11,7 @@ import { RouterService } from 'src/router/router.service';
 import { isSequential } from 'src/utils/arr';
 import { sleep } from 'src/utils/times';
 import { XvmService } from 'src/xvm/xvm.service';
-import { LessThan, LessThanOrEqual, MoreThanOrEqual, QueryFailedError, Repository } from 'typeorm';
+import { In, LessThan, LessThanOrEqual, MoreThanOrEqual, QueryFailedError, Repository } from 'typeorm';
 
 @Injectable()
 export class CoreService {
@@ -62,16 +62,28 @@ export class CoreService {
     async revertBlock(findBlockHeight: number): Promise<number> {
         const confirmBlockHeight = this.defaultConf.bitcoind.confirmBlockHeight
         const { result: findBlockHash } = await this.btcrpcService.getblockhash(findBlockHeight)
+        let snapshotBlockHeights = []
+        for (let index = 1; index <= confirmBlockHeight; index++) {
+            snapshotBlockHeights.push(findBlockHeight - index)
+        }
         const result = await this.blockHashSnapshotRepository.find({
+            where: {
+                blockHeight: In(snapshotBlockHeights)
+            },
             order: {
                 blockHeight: 'DESC'
             },
             take: confirmBlockHeight
         })
+        // No snapshot information is returned for the current block height
         if (result.length == 0) {
             return findBlockHeight
         }
-        const latestBlock = result?.at(0)
+        const latestSnapshotBlock = result?.at(0)
+        // The snapshot information does not match the current block height. The snapshot data is invalid. Return the current block height.
+        if (latestSnapshotBlock.blockHeight != findBlockHeight - 1) {
+            throw new Error(`The snapshot data is abnormal, please ask the administrator to check the database, snapshot latest block:${latestSnapshotBlock.blockHeight}, check block: ${findBlockHeight}`)
+        }
         const rangeBlockHeight = result.map(d => d.blockHeight).reverse()
         // check block height range sequence
         const blockHeightSequentialStatus = isSequential(rangeBlockHeight)
@@ -115,7 +127,7 @@ export class CoreService {
             })
             return revertBlock.blockHeight
         }
-        return latestBlock.blockHeight + 1
+        return latestSnapshotBlock.blockHeight + 1
     }
 
     async processBlock(blockHeight: number): Promise<string> {
