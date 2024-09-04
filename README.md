@@ -23,8 +23,8 @@ The primary function of the BTC Inscription Parsing and Transaction Command Proc
 1. **Clone the repository**:
 
     ```bash
-    git clone https://github.com/your-username/your-repository.git
-    cd your-repository
+    git clone https://github.com/0xVM-Project/0xvm-core.git
+    cd 0xvm-core
     ```
 
 2. **Install dependencies**:
