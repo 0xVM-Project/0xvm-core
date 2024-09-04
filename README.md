@@ -1,73 +1,103 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="200" alt="Nest Logo" /></a>
-</p>
+# 0XVM CORE
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+## Project Overview
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+The primary function of the BTC Inscription Parsing and Transaction Command Processing System is to parse inscriptions from Bitcoin (BTC) transactions' Segregated Witness (SegWit) data, decompress the compressed inscription content to restore it to transaction commands, and then send these commands to the XVM execution layer for processing. Additionally, to address potential blockchain forks in the BTC network, the system is designed with a snapshot mechanism to ensure that, in the event of a fork, inconsistent transactions can be rolled back, maintaining consistency with the main network's transaction data.
 
-## Description
+## Table of Contents
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- [Key Features](#key-features)
+- [Installation](#installation)
+- [Usage Guide](#usage-guide)
+- [Snapshot and Rollback Mechanism](#snapshot-and-rollback-mechanism)
+
+## Key Features
+
+- **Inscription Parsing**: Extract inscription data from the Segregated Witness (SegWit) information in BTC transactions.
+- **Decompression and Restoration**: Decompress the compressed inscription data to restore it to its original transaction commands.
+- **Command Processing**: Send the restored transaction commands to the XVM execution layer for appropriate processing.
+- **Snapshot and Rollback**: In case of a fork in the BTC network, use the snapshot mechanism to roll back transactions during the fork to ensure consistency with the BTC main chain.
 
 ## Installation
 
-```bash
-$ yarn install
-```
+1. **Clone the repository**:
 
-## Running the app
+    ```bash
+    git clone https://github.com/0xVM-Project/0xvm-core.git
+    cd 0xvm-core
+    ```
 
-```bash
-# development
-$ yarn run start
+2. **Install dependencies**:
 
-# watch mode
-$ yarn run start:dev
+    Use npm or yarn to install the dependencies:
 
-# production mode
-$ yarn run start:prod
-```
+    ```bash
+    npm install
+    ```
 
-## Test
+    Or
 
-```bash
-# unit tests
-$ yarn run test
+    ```bash
+    yarn install
+    ```
 
-# e2e tests
-$ yarn run test:e2e
+3. **Environment configuration**:
 
-# test coverage
-$ yarn run test:cov
-```
+    Create a `.env` file and fill in the configuration items according to the `.env.example` file.
 
-## Support
+    ```bash
+    cp .env.example .env
+    ```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## Usage Guide
 
-## Stay in touch
+1. **Start the development server**:
 
-- Author - [Kamil Myśliwiec](https://kamilmysliwiec.com)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+    Use the following command to start the server in development mode:
 
-## License
+    ```bash
+    npm run start:dev
+    ```
 
-Nest is [MIT licensed](LICENSE).
+    Or
+
+    ```bash
+    yarn start:dev
+    ```
+
+2. **Access the service**:
+
+    Once the server is running, the system will start monitoring SegWit transactions on the BTC network, parsing and processing inscription commands.
+
+3. **Run in production environment**:
+
+    In production, first build the project:
+
+    ```bash
+    npm run build
+    ```
+
+    Or
+
+    ```bash
+    yarn build
+    ```
+
+    Then start the production server:
+
+    ```bash
+    npm run start:prod
+    ```
+
+    Or
+
+    ```bash
+    yarn start:prod
+    ```
+
+## Snapshot and Rollback Mechanism
+
+To ensure consistency with BTC network transaction data, this system is designed with a snapshot and rollback mechanism:
+
+- **Snapshot**: Upon detecting a fork in the BTC network, the system will immediately create a snapshot of the current state, allowing it to be restored if needed.
+- **Rollback**: If the fork is confirmed, the system will automatically roll back to the previous snapshot and undo all transaction processing during the fork, ensuring transaction data remains consistent with the BTC main chain.
