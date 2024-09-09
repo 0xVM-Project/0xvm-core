@@ -80,10 +80,6 @@ export class CoreService {
             return findBlockHeight
         }
         const latestSnapshotBlock = result?.at(0)
-        // The snapshot information does not match the current block height. The snapshot data is invalid. Return the current block height.
-        if (latestSnapshotBlock.blockHeight != findBlockHeight - 1) {
-            throw new Error(`The snapshot data is abnormal, please ask the administrator to check the database, snapshot latest block:${latestSnapshotBlock.blockHeight}, check block: ${findBlockHeight}`)
-        }
         const rangeBlockHeight = result.map(d => d.blockHeight).reverse()
         // check block height range sequence
         const blockHeightSequentialStatus = isSequential(rangeBlockHeight)
