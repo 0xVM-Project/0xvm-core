@@ -11,7 +11,7 @@ import { RouterService } from 'src/router/router.service';
 import { isSequential } from 'src/utils/arr';
 import { sleep } from 'src/utils/times';
 import { XvmService } from 'src/xvm/xvm.service';
-import { In, LessThan, LessThanOrEqual, MoreThanOrEqual, QueryFailedError, Repository } from 'typeorm';
+import { In, LessThan, LessThanOrEqual, MoreThanOrEqual, QueryFailedError, Repository,MoreThan } from 'typeorm';
 
 @Injectable()
 export class CoreService {
@@ -59,12 +59,11 @@ export class CoreService {
         }
     }
 
-    async revertBlock(findBlockHeight: number): Promise<number> {
+    async getFinalBlock(verifyBlockHeight: number): Promise<number> {
         const confirmBlockHeight = this.defaultConf.bitcoind.confirmBlockHeight
-        const { result: findBlockHash } = await this.btcrpcService.getblockhash(findBlockHeight)
         let snapshotBlockHeights = []
-        for (let index = 1; index <= confirmBlockHeight; index++) {
-            snapshotBlockHeights.push(findBlockHeight - index)
+        for (let index = 0; index < confirmBlockHeight; index++) {
+            snapshotBlockHeights.push(verifyBlockHeight - index)
         }
         const result = await this.blockHashSnapshotRepository.find({
             where: {
@@ -77,9 +76,8 @@ export class CoreService {
         })
         // No snapshot information is returned for the current block height
         if (result.length == 0) {
-            return findBlockHeight
+            return verifyBlockHeight
         }
-        const latestSnapshotBlock = result?.at(0)
         const rangeBlockHeight = result.map(d => d.blockHeight).reverse()
         // check block height range sequence
         const blockHeightSequentialStatus = isSequential(rangeBlockHeight)
@@ -87,10 +85,7 @@ export class CoreService {
             throw new Error(`Snapshot data is abnormal, and there is missing block information. Block Height range: ${JSON.stringify(rangeBlockHeight ?? [])}`)
         }
         // Compare the snapshot data with the latest block data and return the block height that needs to be rolled back
-        let revertBlock = {
-            blockHeight: findBlockHeight,
-            blockHash: findBlockHash
-        }
+        let finalBlockHeight = result[0].blockHeight
         let retryCount = 0
         for (let index = 0; index < result.length;) {
             const snapshot = result[index]
@@ -103,27 +98,24 @@ export class CoreService {
                     continue
                 }
                 retryCount = 0
-                revertBlock = {
-                    blockHeight: snapshot.blockHeight,
-                    blockHash: blockHashByNetwork
-                }
+                finalBlockHeight = snapshot.blockHeight - 1
             }
             index++
         }
-        if (revertBlock.blockHeight != findBlockHeight) {
+        if (finalBlockHeight != verifyBlockHeight) {
             // todo: revertBlock
-            const state = await this.xvmService.revertBlock(revertBlock.blockHeight - 1)
+            const state = await this.xvmService.revertBlock(finalBlockHeight)
             if (state != true) {
-                throw new Error(`Revert Block [${revertBlock.blockHeight}] fail. `)
+                throw new Error(`Revert Block [${finalBlockHeight}] fail. `)
             } else {
-                this.logger.log(`Revert Block [${revertBlock.blockHeight}] success. `)
+                this.logger.log(`Revert Block [${finalBlockHeight}] success. `)
             }
             await this.blockHashSnapshotRepository.delete({
-                blockHeight: MoreThanOrEqual(revertBlock.blockHeight)
+                blockHeight: MoreThan(finalBlockHeight)
             })
-            return revertBlock.blockHeight
+            return finalBlockHeight
         }
-        return latestSnapshotBlock.blockHeight + 1
+        return finalBlockHeight
     }
 
     async processBlock(blockHeight: number): Promise<string> {
@@ -191,10 +183,11 @@ export class CoreService {
                     await sleep(10000)
                     continue
                 }
-                const currentBlockNumber = this.latestBlockHeightForXvm == 0 ? this.latestBlockHeightForXvm : this.latestBlockHeightForXvm + 1
-                const finalBlockHeight = await this.revertBlock(currentBlockNumber)
-                const processBlockHash = await this.processBlock(finalBlockHeight)
-                await this.snapshotBlock(finalBlockHeight, processBlockHash)
+                // Verify the final block
+                const finalBlockHeightForXvm = await this.getFinalBlock(this.latestBlockHeightForXvm)
+                const processBlockHeightForXvm = finalBlockHeightForXvm + 1
+                const processBlockHashForXvm = await this.processBlock(processBlockHeightForXvm)
+                await this.snapshotBlock(processBlockHeightForXvm, processBlockHashForXvm)
                 retryTotal = 0
             } catch (error) {
                 retryTotal += 1
