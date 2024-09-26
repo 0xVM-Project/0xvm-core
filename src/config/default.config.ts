@@ -11,6 +11,8 @@ export default registerAs('defalut', () => ({
         sysPrivateKey: process.env.SYS_PRIVATE_KEY,
         sysBtcAddress: process.env.SYS_BTC_ADDRESS,
         sysXvmAddress: process.env.SYS_XVM_ADDRESS,
+        operatorPrivateKey: process.env.OPERATOR_PRIVATE_KEY,
+        xbtcPoolAddress: process.env.XBTC_POOL_ADDRESS,
     },
     bitcoind: {
         bitcoinRpcUrl: removeTrailingSlash(process.env.BITCOIN_RPC_URL),

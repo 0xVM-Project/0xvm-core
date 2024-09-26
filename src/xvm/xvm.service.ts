@@ -5,16 +5,21 @@ import { Transaction, ethers } from 'ethers';
 import defaultConfig from 'src/config/default.config';
 import { firstValueFrom } from 'rxjs';
 import { EvmBlockByNumberResponse, EvmMineBlockResponse, EvmRevertBlockResponse, XvmRpcBaseResponse, XvmRpcEngineCreateBlockResponse } from './xvm.interface';
+import { releaseParamSignature } from 'src/utils/paramSignature';
+import * as XBTCPoolABI from '../config/abi/XBTCPoolABI.json'
 
 @Injectable()
 export class XvmService {
     private readonly logger = new Logger(XvmService.name)
     private readonly provider: ethers.Provider
     private readonly sysWallet: ethers.Wallet
+    private readonly operatorWallet: ethers.Wallet
     private readonly chainId: number
     private feeData: ethers.FeeData
     public readonly sysAddress: string
+    public readonly xbtcPoolAddress: string
     private userNonce: Record<string, number> = {}
+    private readonly xbtcPoolContract: ethers.Contract
 
     constructor(
         @Inject(defaultConfig.KEY) private readonly defaultConf: ConfigType<typeof defaultConfig>,
@@ -23,13 +28,16 @@ export class XvmService {
         if (!this.defaultConf.xvm.sysPrivateKey) {
             throw new Error(`System wallet privateKey cannot be empty`)
         }
+        this.xbtcPoolAddress = this.defaultConf.xvm.xbtcPoolAddress
         this.provider = new ethers.JsonRpcProvider(this.defaultConf.xvm.xvmRpcUrl)
         this.sysWallet = new ethers.Wallet(this.defaultConf.xvm.sysPrivateKey, this.provider)
+        this.operatorWallet = new ethers.Wallet(this.defaultConf.xvm.operatorPrivateKey, this.provider)
         this.provider.getFeeData().then(feeData => {
             this.feeData = feeData
         })
         this.sysAddress = this.sysWallet.address
         this.chainId = this.defaultConf.xvm.xvmChainId ?? 42
+        this.xbtcPoolContract = new ethers.Contract(this.xbtcPoolAddress, JSON.stringify(XBTCPoolABI), this.sysWallet)
     }
 
     async rpcClient<T>(method: string, params: any[]) {
@@ -92,21 +100,22 @@ export class XvmService {
         return data.result
     }
 
-    async depositTransfer(to: string, amount: ethers.BigNumberish): Promise<string> {
+    async releaseXBTC(to: string, amount: ethers.BigNumberish): Promise<string> {
         const gasPrice = this.feeData.gasPrice
         const nonce = await this.getNonce(this.sysAddress)
-        const tx = { to: to, value: amount, gasLimit: 21000, gasPrice: gasPrice, nonce: nonce, chainId: this.chainId }
-        const signTransaction = await this.sysWallet.signTransaction(tx)
-        return await this.sendRawTransaction(signTransaction)
+        const signMessage = await releaseParamSignature(to, amount, this.operatorWallet)
+        const tx = await this.xbtcPoolContract.release(to, amount, signMessage, { gasPrice: gasPrice, nonce: nonce, chainId: this.chainId })
+        this.userNonce[this.sysAddress]++
+        return tx.hash
+    }
+
+    async depositTransfer(to: string, amount: ethers.BigNumberish): Promise<string> {
+        return await this.releaseXBTC(to, amount)
     }
 
     async rewardsTransfer(to: string): Promise<string> {
         const amount = ethers.parseUnits('546', 10)
-        const gasPrice = this.feeData.gasPrice
-        const nonce = await this.getNonce(this.sysAddress)
-        const tx = { to: to, value: amount, gasLimit: 21000, gasPrice: gasPrice, nonce: nonce, chainId: this.chainId }
-        const signTransaction = await this.sysWallet.signTransaction(tx)
-        return await this.sendRawTransaction(signTransaction)
+        return await this.releaseXBTC(to, amount)
     }
 
     async minterBlock(timestamp: number) {
