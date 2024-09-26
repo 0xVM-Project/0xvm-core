@@ -89,7 +89,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
                 })
                 logIndex += 1
                 transactionHash.push(hash)
-                this.logger.log(`[${inscription.blockHeight}] Send Transaction success, action:${InscriptionActionEnum[inscriptionCommand.action]}  hash:${hash}`)
+                this.logger.log(`[${inscription.blockHeight}] Send Transaction success, action:${InscriptionActionEnum[inscriptionCommand.action]}  hash: ${hash}`)
             } else {
                 this.logger.warn(`[${inscription.blockHeight}] Send Transaction fail, action:${InscriptionActionEnum[inscriptionCommand.action]} inscriptionId:${inscription.inscriptionId} data:${inscriptionCommand.data}`)
             }
