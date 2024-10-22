@@ -146,14 +146,25 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
 
     async withdraw(data: string, inscription: Inscription): Promise<string> {
         const unsingTransaction = this.xvmService.unSignTransaction(data)
+        // verify withdraw command tx 
+        if (this.defaultConf.xvm.xbtcPoolAddress.toLowerCase() != unsingTransaction.to.toLowerCase()) {
+            this.logger.warn(`Invalid withdraw command(err Contract:${unsingTransaction.to}). inscriptionId:${inscription?.inscriptionId} sender:${unsingTransaction.from} withdraw amount:${unsingTransaction.value.toString()} wei`)
+            return null
+        }
+        if (unsingTransaction.data != '0xd0e30db0') {
+            this.logger.warn(`Invalid withdraw command(err input data: ${unsingTransaction.data}). inscriptionId:${inscription?.inscriptionId} sender:${unsingTransaction.from} withdraw amount:${unsingTransaction.value.toString()} wei`)
+            return null
+        }
         // Deduction of xBTC balance
         const hash = await this.xvmService.sendRawTransaction(data)
         // withdraw btc request
         const toAddressForBtc = await this.withdrawService.getBtcAddress(unsingTransaction.from)
+        // current unsingTransaction.value uint (wei)
+        // 1 stas = 0.00000001 ether = 10000000000 wei
         const withdraw: IWithdraw = {
             fromAddress: this.defaultConf.xvm.sysBtcAddress,
             toAddress: toAddressForBtc,
-            amount: unsingTransaction.value.toString(),
+            amount: (unsingTransaction.value / 10000000000n).toString(),
             evmHash: hash,
             status: 1
         }
