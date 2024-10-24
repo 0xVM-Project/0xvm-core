@@ -23,6 +23,7 @@ export class ProtNotValidService extends ProtocolBase<any, any> {
     **  withdraw = 5
     */
 
+    mineBlock(inscriptionCommand: any) { return null }
     deploy(inscriptionCommand: any) { return null }
     execute(inscriptionCommand: any) { return null }
     transfer(inscriptionCommand: any) { return null }

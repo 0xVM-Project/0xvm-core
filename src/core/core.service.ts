@@ -11,7 +11,7 @@ import { RouterService } from 'src/router/router.service';
 import { isSequential } from 'src/utils/arr';
 import { sleep } from 'src/utils/times';
 import { XvmService } from 'src/xvm/xvm.service';
-import { In, LessThan, LessThanOrEqual, MoreThanOrEqual, QueryFailedError, Repository,MoreThan } from 'typeorm';
+import { In, LessThan, LessThanOrEqual, MoreThanOrEqual, QueryFailedError, Repository, MoreThan } from 'typeorm';
 
 @Injectable()
 export class CoreService {
@@ -21,6 +21,7 @@ export class CoreService {
     private latestBlockHeightForBtc: number
     private latestBlockHeightForXvm: number
     private diffBlock: number
+    private syncStatus: boolean
 
     constructor(
         @Inject(defaultConfig.KEY) private readonly defaultConf: ConfigType<typeof defaultConfig>,
@@ -133,40 +134,25 @@ export class CoreService {
             hashList.push(..._hashList)
         }
         this.logger.log(`[${blockHeight}] xvmInscription:${inscriptionList.length}  xvmTransaction:${hashList.length}`)
-        // create block
-        const minterBlockHash = await this.xvmService.minterBlock(blockTimestamp)
-        this.logger.log(`Generate Block ${blockHeight} is ${minterBlockHash}`)
-        // block hash mapping xvm
-        await this.hashMappingService.bindHash({
-            btcHash: blockHash,
-            xvmHash: minterBlockHash,
-            logIndex: 0
-        })
         return blockHash
     }
 
-    async run() {
+    get isSyncSuccess(): boolean {
+        return this.syncStatus
+    }
+
+    async sync() {
         this.latestBlockHeightForBtc = await this.indexerService.getLatestBlockNumberForBtc()
         this.latestBlockHeightForXvm = await this.xvmService.getLatestBlockNumber()
-        const { result: skipBtcBlockHash } = await this.btcrpcService.getblockhash(this.latestBlockHeightForXvm)
-        const { result: { time: latestBtcBlockTimestamp } } = await this.btcrpcService.getBlockheader(skipBtcBlockHash)
-        // init xvm block, Skip blocks without oxvm protocol inscriptions high
-        let skipMinterBlockTimestamp = latestBtcBlockTimestamp
-        let skipBlockStartTime = Date.now()
-        let skipCostTimestamp = 0
-        while (this.latestBlockHeightForXvm < this.firstInscriptionBlockHeight) {
-            if (this.latestBlockHeightForXvm >= this.latestBlockHeightForBtc) {
-                break
-            }
-            this.latestBlockHeightForXvm += 1
-            // create block
-            await this.xvmService.minterBlock(skipMinterBlockTimestamp)
-            skipMinterBlockTimestamp += 1
-            if (this.latestBlockHeightForXvm % 1000 == 0 || this.latestBlockHeightForXvm == this.firstInscriptionBlockHeight) {
-                skipCostTimestamp = Date.now() - skipBlockStartTime
-                this.logger.log(`Skip Block Progress ${this.latestBlockHeightForXvm}/${this.firstInscriptionBlockHeight}  ${Number(this.latestBlockHeightForXvm / this.firstInscriptionBlockHeight * 100).toFixed(4)}%  cost time: ${skipCostTimestamp}ms(${skipCostTimestamp / 1000}s)`)
-                skipBlockStartTime = Date.now()
-            }
+        // const { result: latestBtcBlockHash } = await this.btcrpcService.getblockhash(this.latestBlockHeightForBtc)
+        // const { result: { time: latestBtcBlockTimestamp } } = await this.btcrpcService.getBlockheader(latestBtcBlockHash)
+        // Get from the broadcasted transaction
+        const latestTxBlockHeightForBtc = 0
+        let latestSyncBlockHeightForBtc = 0
+        if (latestTxBlockHeightForBtc == 0) {
+            latestSyncBlockHeightForBtc = this.firstInscriptionBlockHeight
+        } else {
+            latestSyncBlockHeightForBtc = latestTxBlockHeightForBtc
         }
         let retryTotal = 0
         while (true) {
@@ -175,19 +161,17 @@ export class CoreService {
                     this.logger.warn(`Retry failed several times, please manually process`)
                     break
                 }
-                this.latestBlockHeightForBtc = await this.indexerService.getLatestBlockNumberForBtc()
-                this.latestBlockHeightForXvm = await this.xvmService.getLatestBlockNumber()
-                this.diffBlock = this.latestBlockHeightForBtc - this.latestBlockHeightForXvm
+                this.diffBlock = this.latestBlockHeightForBtc - latestSyncBlockHeightForBtc
                 if (this.diffBlock <= 0) {
-                    this.logger.log(`[${this.latestBlockHeightForXvm}/${this.latestBlockHeightForBtc}] Waiting for new blocks`)
-                    await sleep(10000)
-                    continue
+                    this.logger.log(`[${latestSyncBlockHeightForBtc}/${this.latestBlockHeightForBtc}] Sync Completed`)
+                    break
                 }
                 // Verify the final block
-                const finalBlockHeightForXvm = await this.getFinalBlock(this.latestBlockHeightForXvm)
-                const processBlockHeightForXvm = finalBlockHeightForXvm + 1
-                const processBlockHashForXvm = await this.processBlock(processBlockHeightForXvm)
-                await this.snapshotBlock(processBlockHeightForXvm, processBlockHashForXvm)
+                const finalBlockHeightForXvm = await this.getFinalBlock(latestSyncBlockHeightForBtc)
+                const processBlockHeight = finalBlockHeightForXvm + 1
+                const processBlockHash = await this.processBlock(processBlockHeight)
+                await this.snapshotBlock(processBlockHeight, processBlockHash)
+                latestSyncBlockHeightForBtc = processBlockHeight
                 retryTotal = 0
             } catch (error) {
                 retryTotal += 1
@@ -196,5 +180,9 @@ export class CoreService {
                 await sleep(2000 + 2000 * retryTotal)
             }
         }
+    }
+
+    async run() {
+
     }
 }

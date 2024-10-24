@@ -1,4 +1,5 @@
 export enum InscriptionActionEnum {
+    mineBlock = 0,
     deploy = 1,
     execute = 2,
     transfer = 3,

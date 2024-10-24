@@ -60,6 +60,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         // command list
         for (const inscriptionCommand of inscriptionCommandList) {
             const headers = {
+                [InscriptionActionEnum.mineBlock]: this.mineBlock.bind(this),
                 [InscriptionActionEnum.deploy]: this.deploy.bind(this),
                 [InscriptionActionEnum.execute]: this.execute.bind(this),
                 [InscriptionActionEnum.transfer]: this.transfer.bind(this),
@@ -112,6 +113,14 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         }
         this.logger.log(`[${inscription.blockHeight}] Send Inscription Rewards[546*(10^8)] success, hash: ${hash}`)
         return transactionHash
+    }
+
+    async mineBlock(data: string, inscription: Inscription) :Promise<string> {
+        const blockHeight = parseInt(data.slice(2, 12), 16)
+        const blockTimestamp = parseInt(data.slice(12), 16)
+        const minterBlockHash = await this.xvmService.minterBlock(blockTimestamp)
+        this.logger.log(`Generate Block ${blockHeight} is ${minterBlockHash}`)
+        return minterBlockHash
     }
 
     async deploy(data: string, inscription: Inscription) {
