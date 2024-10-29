@@ -4,7 +4,7 @@ import { ConfigType } from '@nestjs/config';
 import { Transaction, ethers } from 'ethers';
 import defaultConfig from 'src/config/default.config';
 import { firstValueFrom } from 'rxjs';
-import { EvmBlockByNumberResponse, EvmMineBlockResponse, EvmRevertBlockResponse, XvmRpcBaseResponse, XvmRpcEngineCreateBlockResponse } from './xvm.interface';
+import { EvmBlockByNumberResponse, EvmMineBlockResponse, EvmRevertBlockResponse, XvmBlockByNumber, XvmRpcBaseResponse, XvmRpcEngineCreateBlockResponse } from './xvm.interface';
 import { releaseParamSignature } from 'src/utils/paramSignature';
 import * as XBTCPoolABI from '../config/abi/XBTCPoolABI.json'
 
@@ -58,6 +58,13 @@ export class XvmService {
         const response = await this.rpcClient<XvmRpcBaseResponse>('eth_blockNumber', [])
         const blockHeight = response.data.result
         return Number(Number(blockHeight).toString())
+    }
+
+    async getLatestBlock(transactionDetailFlag: boolean = false): Promise<XvmBlockByNumber> {
+        const blockNumbeResponse = await this.rpcClient<XvmRpcBaseResponse>('eth_blockNumber', [])
+        const latestBlockHeight = blockNumbeResponse.data.result
+        const blockByNumberResponse = await this.rpcClient<XvmBlockByNumber>('eth_getBlockByNumber', [latestBlockHeight, transactionDetailFlag])
+        return blockByNumberResponse.data
     }
 
     initNonce() {

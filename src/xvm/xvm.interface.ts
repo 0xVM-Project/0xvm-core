@@ -80,10 +80,33 @@ export interface XvmBlockByNumber {
     blobGasUsed: string,
     excessBlobGas: string,
     uncles: [],
-    transactions: [],
+    transactions: XvmTransaction[] | string[],
     size: string
 }
 
 export interface EvmBlockByNumberResponse extends XvmRpcBaseResponse<XvmBlockByNumber> {
     result: XvmBlockByNumber
+}
+
+export interface XvmTransaction {
+    hash: string,
+    nonce: string,
+    blockHash: string,
+    blockNumber: string,
+    transactionIndex: string,
+    from: string,
+    to: string,
+    value: string,
+    gasPrice: string,
+    gas: string,
+    maxFeePerGas: string,
+    maxPriorityFeePerGas: string,
+    input: string,
+    r: string,
+    s: string,
+    v: string,
+    yParity: string,
+    chainId: string,
+    accessList: any[],
+    type: string
 }
