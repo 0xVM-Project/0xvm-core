@@ -12,6 +12,7 @@ import { XvmModule } from './xvm/xvm.module';
 import { CoreModule } from './core/core.module';
 import { TaskModule } from './task/task.module';
 import { OrdModule } from './ord/ord.module';
+import { InscribeModule } from './inscribe/inscribe.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { OrdModule } from './ord/ord.module';
     CoreModule,
     TaskModule,
     OrdModule,
+    InscribeModule
   ],
   controllers: [AppController,],
   providers: [
