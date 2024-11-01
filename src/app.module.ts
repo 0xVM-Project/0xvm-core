@@ -44,6 +44,6 @@ export class AppModule {
         arrayBuffers: `${(memoryUsage.arrayBuffers / 1024 / 1024).toFixed(2)} MB` // ArrayBuffer Memory
       };
       this.logger.debug(`Memory usage (in MB): ${JSON.stringify(memoryUsageInMB, null, 2)}`);
-    }, 10000)
+    }, 30000)
   }
 }

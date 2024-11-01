@@ -41,6 +41,7 @@ export class CoreService {
         this.indexerService.getLatestBlockNumberForBtc()
             .then(latestBlockHeight => this.latestBlockHeightForBtc = latestBlockHeight)
             .catch(error => { throw error })
+        this.syncStatus = false
     }
 
     async snapshotBlock(blockHeight: number, blockHash?: string) {
@@ -165,39 +166,63 @@ export class CoreService {
         }
 
         // Execution of synchronised transactions
-        // let nextSort = 10
-        // let history: BtcHistoryTx[] = []
-        // while (nextSort == 10 || history.length > 0) {
-        //     history = await this.btcHistoryTxRepository.find({
-        //         where: { isExecuted: false, sort: MoreThan(nextSort) },
-        //         order: { sort: 'ASC' },
-        //         take: 100
-        //     })
-        //     nextSort = history.at(history.length - 1).sort
-        //     // execution inscription
-        //     for (let index = 0; index < history.length; index++) {
-        //         const record = history[index]
-        //         const isPrecompute = record.sort.toString().slice(-1) == '1' ? true : false
-        //         const inscription: Inscription = {
-        //             blockHeight: record.blockHeight,
-        //             inscriptionId: `${record.hash}i0`,
-        //             contentType: 'text/plain',
-        //             contentLength: record.content.length,
-        //             content: record.content
-        //         }
-        //         const hashList = await this.routerService.from(inscription.content).executeTransaction(inscription)
-        //         this.logger.log(`⟱⟱⟱ Sync tx execution ${hashList.length} for ${record.blockHeight} ⟱⟱⟱`)
-        //         if (!isPrecompute && record.blockHeight != history[index + 1].blockHeight) {
-        //             const normalMineBlockHash = this.xvmService.minterBlock(record.blockTimestamp)
-        //             this.logger.log(`Normal Inscription Generate Block ${record.blockHeight} is ${normalMineBlockHash}`)
-        //         }
-        //         await this.btcHistoryTxRepository.update(
-        //             { sort: record.sort },
-        //             { isExecuted: true }
-        //         )
-        //     }
-        // }
-
+        let nextSort = 0
+        let history: BtcHistoryTx[] = []
+        const { result: latestBlockBy0xvm } = await this.xvmService.getLatestBlock()
+        const latestBlockTimestampBy0xvm = parseInt(latestBlockBy0xvm.timestamp.slice(2), 16)
+        const latestBlockHeightBy0xvm = parseInt(latestBlockBy0xvm.number.slice(2), 16)
+        // Synchronous execution start time
+        const syncExecutionStartTime = latestBlockHeightBy0xvm == 0 ? 0 : latestBlockTimestampBy0xvm
+        while (true) {
+            history = await this.btcHistoryTxRepository.find({
+                where: { blockTimestamp: MoreThan(syncExecutionStartTime), sort: MoreThan(nextSort) },
+                order: { sort: 'ASC' },
+                take: 100
+            })
+            if (!history || history.length == 0) {
+                this.logger.log(`↪ Execution of synchronised transactions success. ↩`)
+                break
+            }
+            nextSort = history.at(history.length - 1).sort
+            // execution inscription
+            for (let index = 0; index < history.length; index++) {
+                const record = history[index]
+                const isPrecompute = record.sort.toString().slice(-1) == '1' ? true : false
+                const inscription: Inscription = {
+                    blockHeight: record.blockHeight,
+                    inscriptionId: `${record.hash}i0`,
+                    contentType: 'text/plain',
+                    contentLength: record.content.length,
+                    content: record.content
+                }
+                const hashList = await this.routerService.from(inscription.content).executeTransaction(inscription)
+                this.logger.log(`Sync tx execution ${hashList.length} for ${record.blockHeight}`)
+                // normal tx mine block
+                if (!isPrecompute) {
+                    // Update the status to ensure whether a block needs to be produced
+                    let isMineBlock = false
+                    if (index + 1 < history.length) {
+                        isMineBlock = record.blockHeight != history[index + 1].blockHeight
+                    } else {
+                        const nextRecord = await this.btcHistoryTxRepository.findOne({
+                            where: { sort: MoreThan(record.sort) },
+                            order: { sort: 'ASC' }
+                        })
+                        isMineBlock = nextRecord ? record.blockHeight != nextRecord.blockHeight : true
+                    }
+                    // mine block
+                    if (isMineBlock) {
+                        const normalMineBlockHash = await this.xvmService.minterBlock(record.blockTimestamp)
+                        this.logger.log(`Normal Inscription Generate Block ${record.blockHeight} is ${normalMineBlockHash}`)
+                    }
+                }
+                await this.btcHistoryTxRepository.update(
+                    { sort: record.sort },
+                    { isExecuted: true }
+                )
+            }
+        }
+        this.syncStatus = true
     }
 
     async run() {

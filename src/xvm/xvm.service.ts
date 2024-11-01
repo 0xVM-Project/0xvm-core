@@ -60,10 +60,10 @@ export class XvmService {
         return Number(Number(blockHeight).toString())
     }
 
-    async getLatestBlock(transactionDetailFlag: boolean = false): Promise<XvmBlockByNumber> {
+    async getLatestBlock(transactionDetailFlag: boolean = false): Promise<EvmBlockByNumberResponse> {
         const blockNumbeResponse = await this.rpcClient<XvmRpcBaseResponse>('eth_blockNumber', [])
         const latestBlockHeight = blockNumbeResponse.data.result
-        const blockByNumberResponse = await this.rpcClient<XvmBlockByNumber>('eth_getBlockByNumber', [latestBlockHeight, transactionDetailFlag])
+        const blockByNumberResponse = await this.rpcClient<EvmBlockByNumberResponse>('eth_getBlockByNumber', [latestBlockHeight, transactionDetailFlag])
         return blockByNumberResponse.data
     }
 
