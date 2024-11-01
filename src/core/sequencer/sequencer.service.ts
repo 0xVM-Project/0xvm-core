@@ -18,6 +18,10 @@ export class SequencerService {
         private readonly routerService: RouterService,
     ) { }
 
+    getActualSort(sort: number) {
+        return Math.floor(sort / 10)
+    }
+
     async syncSequencer(blockHeight: number): Promise<number> {
         const { inscriptionList, blockTimestamp } = await this.indexerService.fetchInscription0xvmByBlock(blockHeight)
         const dataList: BtcHistoryTx[] = []
@@ -25,16 +29,14 @@ export class SequencerService {
             where: {},
             order: { sort: 'DESC' },
         })
-        const getActualSort = (sort: number) => {
-            return Math.floor(sort / 10)
-        }
 
         // raw sort=70
         // This is the ranking value of a normal transaction
         // The actual serial number is 7, 0 represents a normal transaction placeholder, and 1 represents a precompute transaction placeholder
         // serial number is 7, 0 means normal transaction
+
         let latestHistoryTxSort = latestHistoryTx ? latestHistoryTx.sort : 0
-        let actualSerialNumber = getActualSort(latestHistoryTxSort)
+        let actualSerialNumber = this.getActualSort(latestHistoryTxSort)
         let protocolService = null
         for (let index = 0; index < inscriptionList.length; index++) {
             const inscription = inscriptionList[index]
@@ -56,7 +58,7 @@ export class SequencerService {
                     continue
                 }
                 const precomputePrevHistoryTx = await this.btcHistoryTxRepository.findOne({ where: { hash: prevHash } })
-                newSort = Number(`${getActualSort(precomputePrevHistoryTx.sort) + 1}1`)
+                newSort = Number(`${this.getActualSort(precomputePrevHistoryTx.sort) + 1}1`)
                 timestamp = mineTimestamp
             }
             dataList.push({

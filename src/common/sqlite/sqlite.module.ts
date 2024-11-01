@@ -11,6 +11,13 @@ import { BtcHistoryTx } from 'src/entities/sqlite-entities/btc-history-tx.entity
             database: 'db/indexer.sqlite', // SQLite Database File Name
             entities: [BtcHistoryTx], // Introduce your entity here
             synchronize: true, // Automatic synchronisation of database structures for use in development environments
+            extra: {
+                max: 5,  // Maximum number of connections
+                min: 1,  // Minimum number of connections
+            },
+            cache: {
+                duration: 30000, // Cache time in milliseconds
+            },
         }),
         TypeOrmModule.forFeature([BtcHistoryTx], 'sqlite')
     ],

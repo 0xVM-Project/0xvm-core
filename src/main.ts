@@ -6,9 +6,13 @@ import { Logger } from '@nestjs/common';
 import * as os from 'os';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule)
   const logger = new Logger('Main')
   const config: ConfigType<typeof defaultConfig> = app.get(defaultConfig.KEY)
+  app.useLogger(config.isEnableDebug == 'true'
+    ? ['log', 'error', 'warn', 'debug', 'verbose']
+    : ['error', 'warn', 'log']
+  )
   await app.listen(config.port, () => {
     const server = app.getHttpServer()
     const address = server.address()

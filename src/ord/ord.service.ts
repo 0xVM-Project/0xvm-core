@@ -16,6 +16,7 @@ export class OrdService {
     ) { }
 
     async getInscriptionByBlockHeight(blockHeight: number) {
+        this.outputFor0xvm = {}
         let blockHash = ''
         if (this.nextBlock && this.nextBlock.blockHeight == blockHeight && this.nextBlock.blockHash) {
             blockHash = this.nextBlock.blockHash

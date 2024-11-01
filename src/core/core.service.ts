@@ -155,6 +155,7 @@ export class CoreService {
         })
         let processBlockHeight = latestHistoryTx ? latestHistoryTx.blockHeight + 1 : this.defaultConf.xvm.firstInscriptionBlockHeight
         while (processBlockHeight <= latestBlockHeightForBtc) {
+            // let savedRow = 0
             const savedRow = await this.sequencerService.syncSequencer(processBlockHeight)
             if (latestBlockHeightForBtc - processBlockHeight <= 1) {
                 latestBlockHeightForBtc = await this.indexerService.getLatestBlockNumberForBtc()
@@ -164,38 +165,38 @@ export class CoreService {
         }
 
         // Execution of synchronised transactions
-        let nextSort = 10
-        let history: BtcHistoryTx[] = []
-        while (nextSort == 10 || history.length > 0) {
-            history = await this.btcHistoryTxRepository.find({
-                where: { isExecuted: false, sort: MoreThan(nextSort) },
-                order: { sort: 'ASC' },
-                take: 100
-            })
-            nextSort = history.at(history.length - 1).sort
-            // execution inscription
-            for (let index = 0; index < history.length; index++) {
-                const record = history[index]
-                const isPrecompute = record.sort.toString().slice(-1) == '1' ? true : false
-                const inscription: Inscription = {
-                    blockHeight: record.blockHeight,
-                    inscriptionId: `${record.hash}i0`,
-                    contentType: 'text/plain',
-                    contentLength: record.content.length,
-                    content: record.content
-                }
-                const hashList = await this.routerService.from(inscription.content).executeTransaction(inscription)
-                this.logger.log(`⟱⟱⟱ Sync tx execution ${hashList.length} for ${record.blockHeight} ⟱⟱⟱`)
-                if (!isPrecompute && record.blockHeight != history[index + 1].blockHeight) {
-                    const normalMineBlockHash = this.xvmService.minterBlock(record.blockTimestamp)
-                    this.logger.log(`Normal Inscription Generate Block ${record.blockHeight} is ${normalMineBlockHash}`)
-                }
-                await this.btcHistoryTxRepository.update(
-                    { sort: record.sort },
-                    { isExecuted: true }
-                )
-            }
-        }
+        // let nextSort = 10
+        // let history: BtcHistoryTx[] = []
+        // while (nextSort == 10 || history.length > 0) {
+        //     history = await this.btcHistoryTxRepository.find({
+        //         where: { isExecuted: false, sort: MoreThan(nextSort) },
+        //         order: { sort: 'ASC' },
+        //         take: 100
+        //     })
+        //     nextSort = history.at(history.length - 1).sort
+        //     // execution inscription
+        //     for (let index = 0; index < history.length; index++) {
+        //         const record = history[index]
+        //         const isPrecompute = record.sort.toString().slice(-1) == '1' ? true : false
+        //         const inscription: Inscription = {
+        //             blockHeight: record.blockHeight,
+        //             inscriptionId: `${record.hash}i0`,
+        //             contentType: 'text/plain',
+        //             contentLength: record.content.length,
+        //             content: record.content
+        //         }
+        //         const hashList = await this.routerService.from(inscription.content).executeTransaction(inscription)
+        //         this.logger.log(`⟱⟱⟱ Sync tx execution ${hashList.length} for ${record.blockHeight} ⟱⟱⟱`)
+        //         if (!isPrecompute && record.blockHeight != history[index + 1].blockHeight) {
+        //             const normalMineBlockHash = this.xvmService.minterBlock(record.blockTimestamp)
+        //             this.logger.log(`Normal Inscription Generate Block ${record.blockHeight} is ${normalMineBlockHash}`)
+        //         }
+        //         await this.btcHistoryTxRepository.update(
+        //             { sort: record.sort },
+        //             { isExecuted: true }
+        //         )
+        //     }
+        // }
 
     }
 
