@@ -5,6 +5,7 @@ import { BtcrpcService } from 'src/common/api/btcrpc/btcrpc.service';
 import { OrdinalsService } from 'src/common/api/ordinals/ordinals.service';
 import defaultConfig from 'src/config/default.config';
 import { BlockHashSnapshot } from 'src/entities/block-snapshot.entity';
+import { BtcHistoryTx } from 'src/entities/sqlite-entities/btc-history-tx.entity';
 import { IndexerService } from 'src/indexer/indexer.service';
 import { HashMappingService } from 'src/router/protocol/hash-mapping/hash-mapping.service';
 import { RouterService } from 'src/router/router.service';
@@ -12,6 +13,8 @@ import { isSequential } from 'src/utils/arr';
 import { sleep } from 'src/utils/times';
 import { XvmService } from 'src/xvm/xvm.service';
 import { In, LessThan, LessThanOrEqual, MoreThanOrEqual, QueryFailedError, Repository, MoreThan } from 'typeorm';
+import { SequencerService } from './sequencer/sequencer.service';
+import { Inscription } from 'src/ord/inscription.service';
 
 @Injectable()
 export class CoreService {
@@ -31,6 +34,8 @@ export class CoreService {
         private readonly xvmService: XvmService,
         private readonly btcrpcService: BtcrpcService,
         private readonly hashMappingService: HashMappingService,
+        @InjectRepository(BtcHistoryTx, 'sqlite') private btcHistoryTxRepository: Repository<BtcHistoryTx>,
+        private readonly sequencerService: SequencerService,
     ) {
         this.firstInscriptionBlockHeight = this.defaultConf.xvm.firstInscriptionBlockHeight
         this.indexerService.getLatestBlockNumberForBtc()
@@ -142,47 +147,60 @@ export class CoreService {
     }
 
     async sync() {
-        this.latestBlockHeightForBtc = await this.indexerService.getLatestBlockNumberForBtc()
-        this.latestBlockHeightForXvm = await this.xvmService.getLatestBlockNumber()
-        // const { result: latestBtcBlockHash } = await this.btcrpcService.getblockhash(this.latestBlockHeightForBtc)
-        // const { result: { time: latestBtcBlockTimestamp } } = await this.btcrpcService.getBlockheader(latestBtcBlockHash)
-        // Get from the broadcasted transaction
-        const latestTxBlockHeightForBtc = 0
-        let latestSyncBlockHeightForBtc = 0
-        if (latestTxBlockHeightForBtc == 0) {
-            latestSyncBlockHeightForBtc = this.firstInscriptionBlockHeight
-        } else {
-            latestSyncBlockHeightForBtc = latestTxBlockHeightForBtc
+        let latestBlockHeightForBtc = await this.indexerService.getLatestBlockNumberForBtc()
+        // sync Sequencer
+        const latestHistoryTx = await this.btcHistoryTxRepository.findOne({
+            where: {},
+            order: { blockHeight: 'DESC' },
+        })
+        let processBlockHeight = latestHistoryTx ? latestHistoryTx.blockHeight + 1 : this.defaultConf.xvm.firstInscriptionBlockHeight
+        while (processBlockHeight <= latestBlockHeightForBtc) {
+            const savedRow = await this.sequencerService.syncSequencer(processBlockHeight)
+            if (latestBlockHeightForBtc - processBlockHeight <= 1) {
+                latestBlockHeightForBtc = await this.indexerService.getLatestBlockNumberForBtc()
+            }
+            this.logger.log(`Sync saved ${processBlockHeight}/${latestBlockHeightForBtc} Inscription Numbers ${savedRow}`)
+            processBlockHeight += 1
         }
-        let retryTotal = 0
-        while (true) {
-            try {
-                if (retryTotal > this.retryCount) {
-                    this.logger.warn(`Retry failed several times, please manually process`)
-                    break
+
+        // Execution of synchronised transactions
+        let nextSort = 10
+        let history: BtcHistoryTx[] = []
+        while (nextSort == 10 || history.length > 0) {
+            history = await this.btcHistoryTxRepository.find({
+                where: { isExecuted: false, sort: MoreThan(nextSort) },
+                order: { sort: 'ASC' },
+                take: 100
+            })
+            nextSort = history.at(history.length - 1).sort
+            // execution inscription
+            for (let index = 0; index < history.length; index++) {
+                const record = history[index]
+                const isPrecompute = record.sort.toString().slice(-1) == '1' ? true : false
+                const inscription: Inscription = {
+                    blockHeight: record.blockHeight,
+                    inscriptionId: `${record.hash}i0`,
+                    contentType: 'text/plain',
+                    contentLength: record.content.length,
+                    content: record.content
                 }
-                this.diffBlock = this.latestBlockHeightForBtc - latestSyncBlockHeightForBtc
-                if (this.diffBlock <= 0) {
-                    this.logger.log(`[${latestSyncBlockHeightForBtc}/${this.latestBlockHeightForBtc}] Sync Completed`)
-                    break
+                const hashList = await this.routerService.from(inscription.content).executeTransaction(inscription)
+                this.logger.log(`⟱⟱⟱ Sync tx execution ${hashList.length} for ${record.blockHeight} ⟱⟱⟱`)
+                if (!isPrecompute && record.blockHeight != history[index + 1].blockHeight) {
+                    const normalMineBlockHash = this.xvmService.minterBlock(record.blockTimestamp)
+                    this.logger.log(`Normal Inscription Generate Block ${record.blockHeight} is ${normalMineBlockHash}`)
                 }
-                // Verify the final block
-                const finalBlockHeightForXvm = await this.getFinalBlock(latestSyncBlockHeightForBtc)
-                const processBlockHeight = finalBlockHeightForXvm + 1
-                const processBlockHash = await this.processBlock(processBlockHeight)
-                await this.snapshotBlock(processBlockHeight, processBlockHash)
-                latestSyncBlockHeightForBtc = processBlockHeight
-                retryTotal = 0
-            } catch (error) {
-                retryTotal += 1
-                this.logger.error(error instanceof Error ? error.stack : error)
-                this.logger.log(`Try retrying ${retryTotal}`)
-                await sleep(2000 + 2000 * retryTotal)
+                await this.btcHistoryTxRepository.update(
+                    { sort: record.sort },
+                    { isExecuted: true }
+                )
             }
         }
+
     }
 
     async run() {
-
+        // 1. sync history tx
+        await this.sync()
     }
 }

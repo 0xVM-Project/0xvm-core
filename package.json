@@ -43,6 +43,7 @@
     "mysql2": "^3.9.9",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
+    "sqlite3": "^5.1.7",
     "tiny-secp256k1": "^2.2.3",
     "typeorm": "^0.3.20"
   },

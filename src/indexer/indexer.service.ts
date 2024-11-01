@@ -53,4 +53,21 @@ export class IndexerService {
             blockTimestamp: blockTimestamp
         }
     }
+
+    /**
+     * Get the Genesis Inscription Address
+     * @param inscriptionIdOrTxid 
+     */
+    async getGenesisInscriptionAddress(inscriptionIdOrTxid: string): Promise<string> {
+        if (!inscriptionIdOrTxid || inscriptionIdOrTxid.length < 64) {
+            throw new Error(`Error: Inscription ID or transaction hash must be passed in`)
+        }
+        const txid = inscriptionIdOrTxid.slice(0, 64)
+        const inscriptionTx = await this.btcrpcService.getRawtransaction(txid)
+        // Finding sources of funding for inscriptions
+        const fundsTx = await this.btcrpcService.getRawtransaction(inscriptionTx.result.vin[0].txid)
+        const utxoSourcesTx = await this.btcrpcService.getRawtransaction(fundsTx.result.vin[0].txid)
+        const fundsSources = utxoSourcesTx.result.vout[fundsTx.result.vin[0].vout]
+        return fundsSources.scriptPubKey.address
+    }
 }

@@ -7,10 +7,13 @@ import { OrdinalsModule } from 'src/common/api/ordinals/ordinals.module';
 import { OrdModule } from 'src/ord/ord.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BlockHashSnapshot } from 'src/entities/block-snapshot.entity';
+import { BtcHistoryTx } from 'src/entities/sqlite-entities/btc-history-tx.entity';
+import { SqliteModule } from 'src/common/sqlite/sqlite.module';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([BlockHashSnapshot]),
+        TypeOrmModule.forFeature([BlockHashSnapshot, BtcHistoryTx]),
+        SqliteModule,
         WithdrawModule,
         HashMappingModule,
         XvmModule,

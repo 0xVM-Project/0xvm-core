@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Timeout } from '@nestjs/schedule';
+import { Timeout,Interval } from '@nestjs/schedule';
 import { OrdinalsService } from 'src/common/api/ordinals/ordinals.service';
 import { CoreService } from 'src/core/core.service';
 

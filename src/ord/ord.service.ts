@@ -1,14 +1,14 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Inscription, InscriptionService } from "./inscription.service";
 import { BtcrpcService } from "src/common/api/btcrpc/btcrpc.service";
-import { TxOutput } from "src/common/api/btcrpc/btcrpc.interface";
+import { BlockTxOutput } from "src/common/api/btcrpc/btcrpc.interface";
 import { CoreService } from "src/core/core.service";
 
 @Injectable()
 export class OrdService {
     private readonly logger = new Logger(InscriptionService.name)
     private nextBlock: { blockHeight: number, blockHash: string }
-    private outputFor0xvm: Record<string, TxOutput[]> = {}
+    private outputFor0xvm: Record<string, BlockTxOutput[]> = {}
 
     constructor(
         private readonly ordService: InscriptionService,
@@ -48,7 +48,7 @@ export class OrdService {
         }
     }
 
-    async getInscriptionTxOutput(txid: string, index = 1): Promise<TxOutput | null> {
+    async getInscriptionTxOutput(txid: string, index = 1): Promise<BlockTxOutput | null> {
         if (this.outputFor0xvm && txid in this.outputFor0xvm && this.outputFor0xvm[txid].length > index) {
             return this.outputFor0xvm[txid].at(index)
         } else {
