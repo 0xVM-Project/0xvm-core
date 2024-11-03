@@ -18,6 +18,10 @@ export class ProtNotValidService extends ProtocolBase<any, any> {
         return null
     }
 
+    encodeInscription(inscription: any) {
+        return null
+    }
+
     /** protocol action
     **  prev = 0,
     **  deploy = 1,

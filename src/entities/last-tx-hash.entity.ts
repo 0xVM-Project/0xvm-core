@@ -1,7 +1,16 @@
-import { Column, CreateDateColumn, Entity, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
-@Entity('last-tx-hash')
+@Entity('last_tx_hash')
 export class LastTxHash {
+  @PrimaryGeneratedColumn()
+  id: number;
+
   @Column({
     name: 'hash',
     type: 'varchar',

@@ -11,10 +11,12 @@ import { HashMappingModule } from 'src/router/protocol/hash-mapping/hash-mapping
 import { SequencerService } from './sequencer/sequencer.service';
 import { SqliteModule } from 'src/common/sqlite/sqlite.module';
 import { BtcHistoryTx } from 'src/entities/sqlite-entities/btc-history-tx.entity';
+import { PreExecutionModule } from 'src/pre-execution/pre-execution.module';
+import { LastTxHash } from 'src/entities/last-tx-hash.entity';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([BlockHashSnapshot]),
+        TypeOrmModule.forFeature([BlockHashSnapshot,LastTxHash]),
         IndexerModule,
         RouterModule,
         XvmModule,
@@ -22,6 +24,7 @@ import { BtcHistoryTx } from 'src/entities/sqlite-entities/btc-history-tx.entity
         OrdModule,
         HashMappingModule,
         SqliteModule,
+        PreExecutionModule
     ],
     providers: [
         CoreService,

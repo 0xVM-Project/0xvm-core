@@ -38,7 +38,6 @@ export class PreBroadcastTx {
   @Column({
     name: 'status',
     type: 'tinyint',
-    length: 3,
     nullable: false,
     default: 0,
     unsigned: true,
@@ -51,7 +50,6 @@ export class PreBroadcastTx {
     name: 'content',
     type: 'text',
     nullable: false,
-    default: '',
     charset: 'utf8mb4',
     collation: 'utf8mb4_general_ci',
   })
@@ -71,7 +69,6 @@ export class PreBroadcastTx {
   @Column({
     name: 'fee_rate',
     type: 'int',
-    length: 9,
     nullable: false,
     default: 0,
     unsigned: true,
@@ -81,7 +78,6 @@ export class PreBroadcastTx {
   @Column({
     name: 'deposit_amount',
     type: 'int',
-    length: 12,
     nullable: false,
     default: 0,
     unsigned: true,
@@ -92,7 +88,6 @@ export class PreBroadcastTx {
     name: 'commit_tx',
     type: 'text',
     nullable: false,
-    default: '',
     charset: 'utf8mb4',
     collation: 'utf8mb4_general_ci',
   })

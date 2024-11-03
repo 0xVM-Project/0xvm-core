@@ -47,7 +47,7 @@ export class PreExecutionService {
 
         if (lastTxHash && lastTxHash?.hash) {
           const content = protocol.encodeInscription(
-            [{ action: InscriptionActionEnum.pre, data: lastTxHash.hash }]
+            [{ action: InscriptionActionEnum.prev, data: lastTxHash.hash }]
               .concat(decodeInscriptionList)
               // todo: mineBlock data = blockHeight + timestamp
               .concat([{ action: InscriptionActionEnum.mineBlock, data: '' }]),
