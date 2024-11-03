@@ -7,6 +7,7 @@ export interface Inscription {
     contentLength: number
     content: string
     timestamp?: number
+    hash?: string;
 }
 
 @Injectable()

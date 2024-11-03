@@ -221,4 +221,54 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         }
         return result
     }
+    
+    base64Encode = (_array?: Uint8Array) => {
+        let result: string | undefined = undefined;
+
+        if (_array && _array?.length) {
+            try {
+                result = Buffer.from(_array).toString('base64');
+            } catch (error) {
+                this.logger.error("base64Decode error: ", error);
+            }
+        }
+
+        return result;
+    };
+
+    flatbuffersEncode(_array: Array<CommandsV1Type>) {
+        let result: Uint8Array | undefined = undefined;
+        const builder = new flatbuffers.Builder(0);
+
+        if (_array && _array?.length) {
+            const contentOffset = _array.map((_item) => {
+                const dataOffset = builder.createString(_item.data);
+                Flatbuffers.Data.startData(builder);
+                Flatbuffers.Data.addAction(builder, _item.action);
+                Flatbuffers.Data.addData(builder, dataOffset);
+                return Flatbuffers.Data.endData(builder);
+            });
+
+            const contentVectorOffset = Flatbuffers.Transaction.createContentVector(builder, contentOffset);
+            Flatbuffers.Transaction.startTransaction(builder);
+            Flatbuffers.Transaction.addContent(builder, contentVectorOffset);
+            const transactionOffset = Flatbuffers.Transaction.endTransaction(builder);
+            builder.finish(transactionOffset);
+            result = builder.asUint8Array();
+        }
+
+        return result;
+    }
+
+    encodeInscription(_array: Array<CommandsV1Type>) {
+        let result: string | undefined = undefined;
+
+        if (_array && _array?.length) {
+            const flatbuffersEncodeArray = this.flatbuffersEncode(_array);
+            const base64EncodeString = this.base64Encode(flatbuffersEncodeArray);
+            result = this.version + base64EncodeString
+        }
+
+        return result;
+    }
 }

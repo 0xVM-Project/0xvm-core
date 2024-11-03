@@ -7,6 +7,7 @@ import {
 import { address as BtcAddress, Transaction, address } from 'bitcoinjs-lib';
 import { bitcoin, regtest, testnet } from 'bitcoinjs-lib/src/networks';
 import ECPairFactory from 'ecpair';
+import { firstValueFrom } from 'rxjs';
 import * as ecc from 'tiny-secp256k1';
 
 export const POSTAGE = 1000; // base value of the inscription in sats

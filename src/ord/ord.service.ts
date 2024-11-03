@@ -36,7 +36,7 @@ export class OrdService {
         for (const tx of block.result.tx) {
             const inscription = this.ordService.getInscriptionContentData(tx.txid, tx.vin[0].txinwitness)
             if (inscription) {
-                inscriptionList.push(inscription)
+                inscriptionList.push({...inscription, hash:tx?.hash??""})
                 this.outputFor0xvm[tx.txid] = tx.vout
             }
         }

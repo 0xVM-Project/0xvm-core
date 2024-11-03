@@ -2,6 +2,7 @@ export interface IProtocol<I, C> {
     filterInscription(ordiInscriptionsContent: I): I | null
     decodeInscription(inscriptionContent: string): Array<C>
     executeTransaction(inscription: I): Promise<Array<string>>
+    encodeInscription(inscriptionArray: Array<C>): string
 
     /** protocol action
     **  deploy = 1,

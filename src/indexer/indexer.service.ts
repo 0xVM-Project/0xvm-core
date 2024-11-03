@@ -31,14 +31,15 @@ export class IndexerService {
         const allInscriptionCount = inscriptionList.length
         const inscriptionFor0xvmList: Array<Inscription> = []
         for await (const inscription of inscriptionList) {
-            const { inscriptionId, content } = inscription
+            const { inscriptionId, content, hash } = inscription
             const inscriptionContent: Inscription = {
                 blockHeight: Number(blockHeight),
                 inscriptionId: inscriptionId,
                 content: content,
                 contentLength: inscription.contentLength,
                 contentType: inscription.contentType,
-                timestamp: blockTimestamp
+                timestamp: blockTimestamp,
+                hash
             }
             const inscriptionFor0xvm = this.routerService.from(inscriptionContent.content).filterInscription(inscriptionContent)
             if (inscriptionFor0xvm) {

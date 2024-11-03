@@ -13,6 +13,7 @@ import { CoreModule } from './core/core.module';
 import { TaskModule } from './task/task.module';
 import { OrdModule } from './ord/ord.module';
 import { InscribeModule } from './inscribe/inscribe.module';
+import { PreExecutionModule } from './pre-execution/pre-execution.module';
 
 @Module({
   imports: [
@@ -24,7 +25,8 @@ import { InscribeModule } from './inscribe/inscribe.module';
     CoreModule,
     TaskModule,
     OrdModule,
-    InscribeModule
+    InscribeModule,
+    PreExecutionModule
   ],
   controllers: [AppController,],
   providers: [
