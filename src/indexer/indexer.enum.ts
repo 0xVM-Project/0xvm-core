@@ -1,5 +1,5 @@
 export enum InscriptionActionEnum {
-    pre = 0,
+    prev = 0,
     deploy = 1,
     execute = 2,
     transfer = 3,

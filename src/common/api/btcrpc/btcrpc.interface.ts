@@ -23,13 +23,36 @@ export interface BlockchainInfoResponse extends BtcBaseResponse<BlockchainInfo> 
     result: BlockchainInfo
 }
 
-export interface TxInput {
+export interface BlockTxInput {
     coinbase: string,
     txinwitness: Array<string>,
     sequence: number
 }
 
-export interface TxOutput {
+export interface BlockTxOutput {
+    value: number,
+    n: number,
+    scriptPubKey: {
+        asm: string,
+        desc: string,
+        hex: string,
+        address: string,
+        type: string
+    }
+}
+
+export interface TransactionTxInput {
+    txid: string,
+    vout: number,
+    scriptSig: {
+        asm: string,
+        hex: string
+    },
+    txinwitness: Array<string>,
+    sequence: number
+}
+
+export interface TransactionTxOutput {
     value: number,
     n: number,
     scriptPubKey: {
@@ -49,8 +72,8 @@ export interface Transaction {
     vsize: number,
     weight: number,
     locktime: number,
-    vin: Array<TxInput>,
-    vout: Array<TxOutput>,
+    vin: Array<TransactionTxInput>,
+    vout: Array<TransactionTxOutput>,
     hex: string,
     blockhash: string,
     confirmations: number,
@@ -85,8 +108,8 @@ interface Block {
         vsize: number,
         weight: number,
         locktime: number,
-        vin: Array<TxInput>,
-        vout: Array<TxOutput>,
+        vin: Array<BlockTxInput>,
+        vout: Array<BlockTxOutput>,
         hex: string
     }>
 }

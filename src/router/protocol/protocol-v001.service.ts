@@ -6,14 +6,15 @@ import * as Flatbuffers from "./flatbuffers/output/zxvm";
 import * as flatbuffers from "flatbuffers";
 import { XvmService } from 'src/xvm/xvm.service';
 import { ethers } from 'ethers';
-import { WithdrawService } from './withdraw/withdraw.service';
-import { IWithdraw } from './withdraw/withdraw.interface';
 import defaultConfig from 'src/config/default.config';
 import { ConfigType } from '@nestjs/config';
 import { HashMappingService } from './hash-mapping/hash-mapping.service';
 import { OrdService } from 'src/ord/ord.service';
 import { Inscription } from 'src/ord/inscription.service';
 import { ProtocolBase } from './protocol-base';
+import { InjectRepository } from '@nestjs/typeorm';
+import { BtcHistoryTx } from 'src/entities/sqlite-entities/btc-history-tx.entity';
+import { Repository } from 'typeorm';
 import { BtcrpcService } from 'src/common/api/btcrpc/btcrpc.service';
 
 
@@ -25,9 +26,9 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
     constructor(
         @Inject(defaultConfig.KEY) private readonly defaultConf: ConfigType<typeof defaultConfig>,
         private readonly xvmService: XvmService,
-        private readonly withdrawService: WithdrawService,
         private readonly hashMappingService: HashMappingService,
         private readonly ordService: OrdService,
+        @InjectRepository(BtcHistoryTx) private btcHistoryTxRepository: Repository<BtcHistoryTx>,
         private readonly btcrpcService: BtcrpcService,
     ) {
         super()
@@ -57,25 +58,41 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         let xvmTo: string = ''
         let logIndex: number = 0
         const inscriptionHash = `0x${inscription.inscriptionId.slice(0, -2)}`
+        let isPreExecutionInscription = false
         // command list
         for (const inscriptionCommand of inscriptionCommandList) {
             const headers = {
-                [InscriptionActionEnum.mineBlock]: this.mineBlock.bind(this),
+                [InscriptionActionEnum.prev]: this.prev.bind(this),
                 [InscriptionActionEnum.deploy]: this.deploy.bind(this),
                 [InscriptionActionEnum.execute]: this.execute.bind(this),
                 [InscriptionActionEnum.transfer]: this.transfer.bind(this),
                 [InscriptionActionEnum.deposit]: this.deposit.bind(this),
                 [InscriptionActionEnum.withdraw]: this.withdraw.bind(this),
+                [InscriptionActionEnum.mineBlock]: this.mineBlock.bind(this)
             }
             if (!(inscriptionCommand.action in headers)) {
                 this.logger.warn(`create transaction fail, Action is out of scope`)
                 return null
+            }
+            // Pre-execution inscription head info
+            if (inscriptionCommand.action == InscriptionActionEnum.prev) {
+                isPreExecutionInscription = true
+                continue
+            }
+            // mine block inscription command
+            if (inscriptionCommand.action == InscriptionActionEnum.mineBlock) {
+                await headers[inscriptionCommand.action](inscriptionCommand.data, inscription).catch(error => {
+                    throw new Error(`execute transaction fail. action:${inscriptionCommand.action} data:${inscriptionCommand.data}\n ${error?.stack} inscriptionId:${inscription?.inscriptionId}`)
+                })
+                continue
             }
             if (!xvmFrom) {
                 const unsingTransaction = this.xvmService.unSignTransaction(inscriptionCommand.data)
                 xvmFrom = unsingTransaction.from
                 xvmTo = unsingTransaction.to
             }
+
+            // Normal inscription command
             const hash = await headers[inscriptionCommand.action](inscriptionCommand.data, inscription).catch(error => {
                 throw new Error(`execute transaction fail. action:${inscriptionCommand.action} data:${inscriptionCommand.data}\n ${error?.stack} inscriptionId:${inscription?.inscriptionId}`)
             })
@@ -95,8 +112,10 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
                 this.logger.warn(`[${inscription.blockHeight}] Send Transaction fail, action:${InscriptionActionEnum[inscriptionCommand.action]} inscriptionId:${inscription.inscriptionId} data:${inscriptionCommand.data}`)
             }
         }
-        // inscription rewards
-        const toRewards = xvmFrom
+
+        // Pre-execution inscription rewards
+        // Normal inscription rewards
+        const toRewards = isPreExecutionInscription ? this.defaultConf.xvm.sysXvmAddress : xvmFrom
         const hash = await this.xvmService.rewardsTransfer(toRewards).catch(error => {
             throw new Error(`inscription rewards fail. sysAddress: ${this.xvmService.sysAddress} to: ${toRewards} inscriptionId: ${inscription.inscriptionId}\n ${error?.stack}`)
         })
@@ -115,12 +134,16 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         return transactionHash
     }
 
-    async mineBlock(data: string, inscription: Inscription) :Promise<string> {
+    async mineBlock(data: string, inscription: Inscription): Promise<string> {
         const blockHeight = parseInt(data.slice(2, 12), 16)
         const blockTimestamp = parseInt(data.slice(12), 16)
         const minterBlockHash = await this.xvmService.minterBlock(blockTimestamp)
-        this.logger.log(`Generate Block ${blockHeight} is ${minterBlockHash}`)
+        this.logger.log(`Precompute Inscription Generate Block ${blockHeight} is ${minterBlockHash}`)
         return minterBlockHash
+    }
+
+    async prev(data: string, inscription: Inscription) {
+        return null
     }
 
     async deploy(data: string, inscription: Inscription) {
@@ -165,20 +188,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
             return null
         }
         // Deduction of xBTC balance
-        const hash = await this.xvmService.sendRawTransaction(data)
-        // withdraw btc request
-        const toAddressForBtc = await this.withdrawService.getBtcAddress(unsingTransaction.from)
-        // current unsingTransaction.value uint (wei)
-        // 1 stas = 0.00000001 ether = 10000000000 wei
-        const withdraw: IWithdraw = {
-            fromAddress: this.defaultConf.xvm.sysBtcAddress,
-            toAddress: toAddressForBtc,
-            amount: (unsingTransaction.value / 10000000000n).toString(),
-            evmHash: hash,
-            status: 1
-        }
-        await this.withdrawService.withdrawRequest(withdraw)
-        return hash
+        return await this.xvmService.sendRawTransaction(data)
     }
 
     base64Decode(base64String: string): Uint8Array {
@@ -220,6 +230,41 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
             }
         }
         return result
+    }
+
+    /**
+     * Get the Genesis Inscription Address
+     * @param inscriptionIdOrTxid 
+     */
+    async getGenesisInscriptionAddress(inscriptionIdOrTxid: string): Promise<string> {
+        if (!inscriptionIdOrTxid || inscriptionIdOrTxid.length < 64) {
+            throw new Error(`Error: Inscription ID or transaction hash must be passed in`)
+        }
+        const txid = inscriptionIdOrTxid.slice(0, 64)
+        const inscriptionTx = await this.btcrpcService.getRawtransaction(txid)
+        // Finding sources of funding for inscriptions
+        const fundsTx = await this.btcrpcService.getRawtransaction(inscriptionTx.result.vin[0].txid)
+        const utxoSourcesTx = await this.btcrpcService.getRawtransaction(fundsTx.result.vin[0].txid)
+        const fundsSources = utxoSourcesTx.result.vout[fundsTx.result.vin[0].vout]
+        return fundsSources.scriptPubKey.address
+    }
+
+    isPrecomputeInscription(inscriptionContent: string): { isPrecompute: boolean, mineTimestamp: number, prevHash: string } {
+        if (!inscriptionContent.startsWith(this.version)) {
+            throw new Error(`protocol: ${inscriptionContent.slice(0, 6)} Invalid or incompatible with current protocol version.`)
+        }
+        const command = this.decodeInscription(inscriptionContent)
+        const firstCommand = command.at(0)
+        const endCommand = command.at(command.length - 1)
+        const isPrecompute = firstCommand.action == 0 ? true : false
+
+        const blockHeight = parseInt(endCommand.data.slice(2, 12), 16)
+        const mineTimestamp = parseInt(endCommand.data.slice(12), 16)
+        return {
+            isPrecompute: isPrecompute,
+            mineTimestamp: mineTimestamp,
+            prevHash: isPrecompute ? firstCommand.data : null
+        }
     }
     
     base64Encode = (_array?: Uint8Array) => {

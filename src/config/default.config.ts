@@ -3,6 +3,7 @@ import { removeTrailingSlash } from 'src/utils/http'
 
 export default registerAs('defalut', () => ({
     port: process.env.NEST_APP_PORT,
+    isEnableDebug: process.env.IS_ENABLE_DEBUG,
     xvm: {
         xvmRpcUrl: removeTrailingSlash(process.env.XVM_RPC_URL),
         xvmNetwork: process.env.XVM_NETWORK,

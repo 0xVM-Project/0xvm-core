@@ -3,6 +3,7 @@ import { InscriptionService } from './inscription.service';
 import { CommonModule } from 'src/common/common.module';
 import { ApiModule } from 'src/common/api/api.module';
 import { BtcrpcService } from 'src/common/api/btcrpc/btcrpc.service';
+import { OrdModule } from './ord.module';
 
 describe('OrdService', () => {
   let module: TestingModule

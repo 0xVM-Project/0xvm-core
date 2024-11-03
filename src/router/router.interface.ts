@@ -17,4 +17,7 @@ export interface IProtocol<I, C> {
     transfer(data: string, inscription: I): Promise<string>
     deposit(data: string, inscription: I): Promise<string>
     withdraw(data: string, inscription: I): Promise<string>
+    prev(data: string, inscription: I): Promise<string>
+    mineBlock(data: string, inscription: I): Promise<string>
+    isPrecomputeInscription(inscriptionContent: string): { isPrecompute: boolean, mineTimestamp: number, prevHash: string }
 }

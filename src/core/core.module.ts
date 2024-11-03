@@ -8,6 +8,9 @@ import { OrdModule } from 'src/ord/ord.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BlockHashSnapshot } from 'src/entities/block-snapshot.entity';
 import { HashMappingModule } from 'src/router/protocol/hash-mapping/hash-mapping.module';
+import { SequencerService } from './sequencer/sequencer.service';
+import { SqliteModule } from 'src/common/sqlite/sqlite.module';
+import { BtcHistoryTx } from 'src/entities/sqlite-entities/btc-history-tx.entity';
 
 @Module({
     imports: [
@@ -18,9 +21,11 @@ import { HashMappingModule } from 'src/router/protocol/hash-mapping/hash-mapping
         OrdinalsModule,
         OrdModule,
         HashMappingModule,
+        SqliteModule,
     ],
     providers: [
         CoreService,
+        SequencerService,
     ],
     exports: [
         CoreService

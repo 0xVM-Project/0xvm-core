@@ -6,6 +6,7 @@ import defaultConfig from 'src/config/default.config';
 import { InterceptorModule } from './interceptor/interceptor.module';
 import { AxiosModule } from './axios/axios.module';
 import { ApiModule } from './api/api.module';
+import { SqliteModule } from './sqlite/sqlite.module';
 
 @Module({
     imports: [
