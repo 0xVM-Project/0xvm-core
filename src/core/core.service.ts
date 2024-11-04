@@ -144,7 +144,9 @@ export class CoreService {
         }
         // preExecution update: save last transaction hash to database for preExecution
         try {
-            await this.lastTxHash.update({},{ hash: lastTransactionHash})
+            if(lastTransactionHash){
+                await this.lastTxHash.update({},{ hash: lastTransactionHash})
+            }
         } catch (error) {
             this.logger.error("add lastTxHsh failed")
             throw error

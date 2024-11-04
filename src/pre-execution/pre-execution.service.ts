@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LastTxHash } from 'src/entities/last-tx-hash.entity';
 import { PendingTx } from 'src/entities/pending-tx.entity';
 import { PreBroadcastTxItem } from 'src/entities/pre-broadcast-tx-item.entity';
 import { PreBroadcastTx } from 'src/entities/pre-broadcast-tx.entity';
@@ -17,8 +16,6 @@ export class PreExecutionService {
   constructor(
     @InjectRepository(PendingTx)
     private readonly pendingTx: Repository<PendingTx>,
-    @InjectRepository(LastTxHash)
-    private readonly lastTxHash: Repository<LastTxHash>,
     @InjectRepository(PreBroadcastTxItem)
     private readonly preBroadcastTxItem: Repository<PreBroadcastTxItem>,
     @InjectRepository(PreBroadcastTx)
@@ -36,6 +33,7 @@ export class PreExecutionService {
       let availablePreTransactionList: PendingTx[] = [];
       let decodeInscriptionString = '';
       let protocol: IProtocol<any, any>;
+      let isInscriptionEnd = false;
 
       for (const preTransaction of preTransactionList) {
         const content = preTransaction?.content ?? '';
@@ -49,22 +47,39 @@ export class PreExecutionService {
             decodeInscriptionList.concat(protocol.decodeInscription(content));
             availablePreTransactionList.push(preTransaction);
           } else {
+            isInscriptionEnd = true;
             break;
           }
         }
       }
 
       if (
+        isInscriptionEnd &&
         decodeInscriptionList &&
         decodeInscriptionList?.length > 0 &&
         availablePreTransactionList &&
         availablePreTransactionList?.length > 0
       ) {
         let preBroadcastTxId = 0;
+        const txList = [
+          {
+            action: InscriptionActionEnum.prev,
+            data: '0x0000000000000000000000000000000000000000000000000000000000000000',
+          },
+        ]
+          .concat(decodeInscriptionList)
+          .concat([
+            {
+              action: InscriptionActionEnum.mineBlock,
+              data: `0x${finalBlockHeightForXvm.toString(16).padStart(10, '0')}${Math.floor(Date.now() / 1000).toString(16)}`,
+            },
+          ]);
+
+        const content = protocol.encodeInscription(txList);
 
         try {
           const preBroadcastTx = await this.preBroadcastTx.save(
-            this.preBroadcastTx.create(),
+            this.preBroadcastTx.create({ content }),
           );
 
           if (preBroadcastTx && preBroadcastTx?.id) {
@@ -76,28 +91,13 @@ export class PreExecutionService {
         }
 
         if (preBroadcastTxId) {
-          const txList = [
-            {
-              action: InscriptionActionEnum.prev,
-              data: '0x0000000000000000000000000000000000000000000000000000000000000000',
-            },
-          ]
-            .concat(decodeInscriptionList)
-            .concat([
-              {
-                action: InscriptionActionEnum.mineBlock,
-                data: `0x${finalBlockHeightForXvm.toString(16).padStart(10, '0')}${Math.floor(Date.now() / 1000).toString(16)}`,
-              },
-            ]);
-
-          const content = protocol.encodeInscription(txList);
           const inscription = {
             inscriptionId:
               '0x0000000000000000000000000000000000000000000000000000000000000000',
             contentType: '',
             contentLength: 0,
             content,
-            hash: '0000000000000000000000000000000000000000000000000000000000000000'
+            hash: '0000000000000000000000000000000000000000000000000000000000000000',
           };
           const hashList = await protocol.executeTransaction(inscription);
 
