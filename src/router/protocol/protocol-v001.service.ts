@@ -40,7 +40,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         return this.flatbuffersDecode(base64Decode)
     }
 
-    async executeTransaction(inscription: Inscription): Promise<Array<string>> {
+    async executeTransaction(inscription: Inscription, isInscriptionEnd?: boolean): Promise<Array<string>> {
         if (!inscription?.content || !inscription?.inscriptionId) {
             throw new Error(`Inscription content or inscription id cannot be empty`)
         }
@@ -126,21 +126,23 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         // Pre-execution inscription rewards
         // Normal inscription rewards
         const toRewards = isPreExecutionInscription ? this.defaultConf.xvm.sysXvmAddress : xvmFrom
-        const hash = await this.xvmService.rewardsTransfer(toRewards).catch(error => {
-            throw new Error(`inscription rewards fail. sysAddress: ${this.xvmService.sysAddress} to: ${toRewards} inscriptionId: ${inscription.inscriptionId}\n ${error?.stack}`)
-        })
-        if (hash) {
-            // hash mapping        
-            await this.hashMappingService.bindHash({
-                xFromAddress: xvmFrom ?? '',
-                xToAddress: xvmTo ?? '',
-                btcHash: inscriptionHash,
-                xvmHash: hash,
-                logIndex: logIndex
+        if (!isPreExecutionInscription || isInscriptionEnd) {
+            const hash = await this.xvmService.rewardsTransfer(toRewards).catch(error => {
+                throw new Error(`inscription rewards fail. sysAddress: ${this.xvmService.sysAddress} to: ${toRewards} inscriptionId: ${inscription.inscriptionId}\n ${error?.stack}`)
             })
-            transactionHash.push(hash)
+            if (hash) {
+                // hash mapping        
+                await this.hashMappingService.bindHash({
+                    xFromAddress: xvmFrom ?? '',
+                    xToAddress: xvmTo ?? '',
+                    btcHash: inscriptionHash,
+                    xvmHash: hash,
+                    logIndex: logIndex
+                })
+                transactionHash.push(hash)
+            }
+            this.logger.log(`[${inscription?.blockHeight}] Send Inscription Rewards[546*(10^8)] success, hash: ${hash}`)
         }
-        this.logger.log(`[${inscription.blockHeight}] Send Inscription Rewards[546*(10^8)] success, hash: ${hash}`)
         return transactionHash
     }
 
