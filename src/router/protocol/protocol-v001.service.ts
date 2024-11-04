@@ -12,9 +12,6 @@ import { HashMappingService } from './hash-mapping/hash-mapping.service';
 import { OrdService } from 'src/ord/ord.service';
 import { Inscription } from 'src/ord/inscription.service';
 import { ProtocolBase } from './protocol-base';
-import { InjectRepository } from '@nestjs/typeorm';
-import { BtcHistoryTx } from 'src/entities/sqlite-entities/btc-history-tx.entity';
-import { Repository } from 'typeorm';
 import { BtcrpcService } from 'src/common/api/btcrpc/btcrpc.service';
 
 
@@ -28,14 +25,13 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         private readonly xvmService: XvmService,
         private readonly hashMappingService: HashMappingService,
         private readonly ordService: OrdService,
-        @InjectRepository(BtcHistoryTx) private btcHistoryTxRepository: Repository<BtcHistoryTx>,
         private readonly btcrpcService: BtcrpcService,
     ) {
         super()
     }
 
-    filterInscription(ordiInscriptionsContent: Inscription): Inscription | null {
-        return ordiInscriptionsContent.content.startsWith(this.version) ? ordiInscriptionsContent : null
+    filterInscription(inscription: Inscription): Inscription | null {
+        return inscription.content.startsWith(this.version) ? inscription : null
     }
 
     decodeInscription(inscriptionContent: string): Array<CommandsV1Type> {
@@ -60,7 +56,9 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         const inscriptionHash = `0x${inscription.inscriptionId.slice(0, -2)}`
         let isPreExecutionInscription = false
         // command list
-        for (const inscriptionCommand of inscriptionCommandList) {
+        for (let index = 0; index < inscriptionCommandList.length; index++) {
+            const inscriptionCommand = inscriptionCommandList[index]
+            const actionEnum = inscriptionCommand.action as InscriptionActionEnum
             const headers = {
                 [InscriptionActionEnum.prev]: this.prev.bind(this),
                 [InscriptionActionEnum.deploy]: this.deploy.bind(this),
@@ -70,31 +68,43 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
                 [InscriptionActionEnum.withdraw]: this.withdraw.bind(this),
                 [InscriptionActionEnum.mineBlock]: this.mineBlock.bind(this)
             }
-            if (!(inscriptionCommand.action in headers)) {
+            if (!(actionEnum in headers)) {
                 this.logger.warn(`create transaction fail, Action is out of scope`)
-                return null
+                return []
             }
             // Pre-execution inscription head info
-            if (inscriptionCommand.action == InscriptionActionEnum.prev) {
+            if (actionEnum == InscriptionActionEnum.prev) {
                 isPreExecutionInscription = true
                 continue
             }
             // mine block inscription command
-            if (inscriptionCommand.action == InscriptionActionEnum.mineBlock) {
-                await headers[inscriptionCommand.action](inscriptionCommand.data, inscription).catch(error => {
-                    throw new Error(`execute transaction fail. action:${inscriptionCommand.action} data:${inscriptionCommand.data}\n ${error?.stack} inscriptionId:${inscription?.inscriptionId}`)
+            if (actionEnum == InscriptionActionEnum.mineBlock) {
+                await headers[actionEnum](inscriptionCommand.data, inscription).catch((error: { stack: any; }) => {
+                    throw new Error(`execute transaction fail. action:${actionEnum} data:${inscriptionCommand.data}\n ${error?.stack} inscriptionId:${inscription?.inscriptionId}`)
                 })
                 continue
             }
             if (!xvmFrom) {
-                const unsingTransaction = this.xvmService.unSignTransaction(inscriptionCommand.data)
-                xvmFrom = unsingTransaction.from
-                xvmTo = unsingTransaction.to
+                const unSignTransaction = this.xvmService.unSignTransaction(inscriptionCommand.data)
+                if (!unSignTransaction) {
+                    this.logger.warn(`Invalid command hash: ${inscription?.hash} index: ${index}`)
+                    continue
+                }
+                if (!unSignTransaction.from) {
+                    this.logger.warn(`Invalid command hash: ${inscription?.hash} index: ${index}, Unable to parse the from address from signTransaction`)
+                    continue
+                }
+                if (!unSignTransaction.to) {
+                    this.logger.warn(`Invalid command hash: ${inscription?.hash} index: ${index}, Unable to parse the to address from signTransaction`)
+                    continue
+                }
+                xvmFrom = unSignTransaction.from
+                xvmTo = unSignTransaction.to
             }
 
             // Normal inscription command
-            const hash = await headers[inscriptionCommand.action](inscriptionCommand.data, inscription).catch(error => {
-                throw new Error(`execute transaction fail. action:${inscriptionCommand.action} data:${inscriptionCommand.data}\n ${error?.stack} inscriptionId:${inscription?.inscriptionId}`)
+            const hash = await headers[actionEnum](inscriptionCommand.data, inscription).catch((error: { stack: any; }) => {
+                throw new Error(`execute transaction fail. action:${actionEnum} data:${inscriptionCommand.data}\n ${error?.stack} inscriptionId:${inscription?.inscriptionId}`)
             })
             if (hash) {
                 // hash mapping
@@ -107,9 +117,9 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
                 })
                 logIndex += 1
                 transactionHash.push(hash)
-                this.logger.log(`[${inscription.blockHeight}] Send Transaction success, action:${InscriptionActionEnum[inscriptionCommand.action]}  hash: ${hash}`)
+                this.logger.log(`[${inscription.blockHeight}] Send Transaction success, action:${InscriptionActionEnum[actionEnum]}  hash: ${hash}`)
             } else {
-                this.logger.warn(`[${inscription.blockHeight}] Send Transaction fail, action:${InscriptionActionEnum[inscriptionCommand.action]} inscriptionId:${inscription.inscriptionId} data:${inscriptionCommand.data}`)
+                this.logger.warn(`[${inscription.blockHeight}] Send Transaction fail, action:${InscriptionActionEnum[actionEnum]} inscriptionId:${inscription.inscriptionId} data:${inscriptionCommand.data}`)
             }
         }
 
@@ -142,11 +152,11 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         return minterBlockHash
     }
 
-    async prev(data: string, inscription: Inscription) {
-        return null
+    async prev(data: string, inscription: Inscription): Promise<string> {
+        return ''
     }
 
-    async deploy(data: string, inscription: Inscription) {
+    async deploy(data: string, inscription: Inscription): Promise<string> {
         return await this.xvmService.sendRawTransaction(data)
     }
 
@@ -158,33 +168,45 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         return await this.xvmService.sendRawTransaction(data)
     }
 
-    async deposit(data: string, inscription: Inscription): Promise<string> {
-        const unsingTransaction = this.xvmService.unSignTransaction(data)
-        const to = unsingTransaction.from
-        const txid = inscription.inscriptionId.slice(0, -2)
+    async deposit(data: string, inscription: Inscription): Promise<string | null> {
+        const unSignTransaction = this.xvmService.unSignTransaction(data)
+        if (!unSignTransaction) {
+            this.logger.warn(`Invalid command hash: ${inscription?.hash}`)
+            return null
+        }
+        if (!unSignTransaction.from) {
+            this.logger.warn(`Invalid command hash: ${inscription?.hash}, Unable to parse the from address from signTransaction`)
+            return null
+        }
+        const to = unSignTransaction.from
+        const txid = inscription.hash
         const depositOutput = await this.ordService.getInscriptionTxOutput(txid, 1)
         if (!depositOutput) {
-            this.logger.warn(`Invalid deposit. No deposit funds were sent. inscriptionId:${inscription.inscriptionId} sender:${unsingTransaction.from} inscriptionId:${inscription.inscriptionId}`)
+            this.logger.warn(`Invalid deposit. No deposit funds were sent. inscriptionId:${inscription.inscriptionId} sender:${unSignTransaction.from} inscriptionId:${inscription.inscriptionId}`)
             return null
         }
         const { scriptPubKey: { address }, value } = depositOutput
         // If the deposit address is not the system address, the deposit is invalid.
         if (this.defaultConf.xvm.sysBtcAddress != address) {
-            this.logger.warn(`Invalid deposit. Invalid funds deposit address. inscriptionId:${inscription.inscriptionId} sender:${unsingTransaction.from}  deposit system address:${address}`)
+            this.logger.warn(`Invalid deposit. Invalid funds deposit address. inscriptionId:${inscription.inscriptionId} sender:${unSignTransaction.from}  deposit system address:${address}`)
             return null
         }
         return await this.xvmService.depositTransfer(to, ethers.parseEther(value.toString()))
     }
 
-    async withdraw(data: string, inscription: Inscription): Promise<string> {
-        const unsingTransaction = this.xvmService.unSignTransaction(data)
-        // verify withdraw command tx 
-        if (this.defaultConf.xvm.xbtcPoolAddress.toLowerCase() != unsingTransaction.to.toLowerCase()) {
-            this.logger.warn(`Invalid withdraw command(err Contract:${unsingTransaction.to}). inscriptionId:${inscription?.inscriptionId} sender:${unsingTransaction.from} withdraw amount:${unsingTransaction.value.toString()} wei`)
+    async withdraw(data: string, inscription: Inscription): Promise<string | null> {
+        const unSignTransaction = this.xvmService.unSignTransaction(data)
+        if (!unSignTransaction) {
+            this.logger.warn(`Invalid SignTransaction, cannot be parsed, hash=${inscription.hash}`)
             return null
         }
-        if (unsingTransaction.data != '0xd0e30db0') {
-            this.logger.warn(`Invalid withdraw command(err input data: ${unsingTransaction.data}). inscriptionId:${inscription?.inscriptionId} sender:${unsingTransaction.from} withdraw amount:${unsingTransaction.value.toString()} wei`)
+        // verify withdraw command tx 
+        if (this.defaultConf.xvm.xbtcPoolAddress.toLowerCase() != unSignTransaction.to?.toLowerCase()) {
+            this.logger.warn(`Invalid withdraw command(err Contract:${unSignTransaction.to}). inscriptionId:${inscription?.inscriptionId} sender:${unSignTransaction.from} withdraw amount:${unSignTransaction.value.toString()} wei`)
+            return null
+        }
+        if (unSignTransaction.data != '0xd0e30db0') {
+            this.logger.warn(`Invalid withdraw command(err input data: ${unSignTransaction.data}). inscriptionId:${inscription?.inscriptionId} sender:${unSignTransaction.from} withdraw amount:${unSignTransaction.value.toString()} wei`)
             return null
         }
         // Deduction of xBTC balance
@@ -215,13 +237,16 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
                 for (let i = 0; i < transactions?.contentLength(); i++) {
                     const content = transactions.content(i)
                     const action = content?.action()
+                    if (!content || !action) {
+                        continue
+                    }
                     // check data
-                    if (!content?.data().startsWith('0x')) {
+                    if (!content.data()?.startsWith('0x')) {
                         this.logger.warn(`Command data error, must start with 0x.`)
                         continue
                     }
-                    if (![1, 2, 3, 4, 5].includes(action)) {
-                        this.logger.warn(`Command action error, must in [1,2,3,4,5].`)
+                    if (![0, 1, 2, 3, 4, 5, 6].includes(action)) {
+                        this.logger.warn(`Command action error, must in [0,1,2,3,4,5,6].`)
                         continue
                     }
                     const data = content?.data() as `0x${string}`
@@ -254,8 +279,11 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
             throw new Error(`protocol: ${inscriptionContent.slice(0, 6)} Invalid or incompatible with current protocol version.`)
         }
         const command = this.decodeInscription(inscriptionContent)
-        const firstCommand = command.at(0)
-        const endCommand = command.at(command.length - 1)
+        if (command.length == 0) {
+            throw new Error(`Invalid inscription code, cannot be parsed`)
+        }
+        const firstCommand = command[0]
+        const endCommand = command[command.length - 1]
         const isPrecompute = firstCommand.action == 0 ? true : false
 
         const blockHeight = parseInt(endCommand.data.slice(2, 12), 16)
@@ -263,10 +291,10 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         return {
             isPrecompute: isPrecompute,
             mineTimestamp: mineTimestamp,
-            prevHash: isPrecompute ? firstCommand.data : null
+            prevHash: isPrecompute ? firstCommand.data : ''
         }
     }
-    
+
     base64Encode = (_array?: Uint8Array) => {
         let result: string | undefined = undefined;
 
@@ -305,7 +333,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         return result;
     }
 
-    encodeInscription(_array: Array<CommandsV1Type>) {
+    encodeInscription(_array: Array<CommandsV1Type>): string | null {
         let result: string | undefined = undefined;
 
         if (_array && _array?.length) {
@@ -314,6 +342,6 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
             result = this.version + base64EncodeString
         }
 
-        return result;
+        return result ?? null;
     }
 }

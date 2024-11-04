@@ -86,9 +86,15 @@ export class XvmService {
     }
 
     async sendRawTransaction(signTransaction: string): Promise<string> {
+        const unSignTransaction = this.unSignTransaction(signTransaction)
+        if (!unSignTransaction) {
+            throw new Error(`signTransaction cannot be parsed`)
+        }
+        if (!unSignTransaction.from) {
+            throw new Error(`Unable to parse the from address from signTransaction`)
+        }
         const response = await this.rpcClient<XvmRpcBaseResponse>('eth_sendRawTransaction', [signTransaction])
         const data = response.data
-        const unSignTransaction = this.unSignTransaction(signTransaction)
         if ('error' in data) {
             const { code, message } = data.error as any
             let rawTx = unSignTransaction.toJSON()
@@ -96,7 +102,7 @@ export class XvmService {
                 ...rawTx,
                 data: rawTx?.data != '0x' ? rawTx?.data.slice(0, 20) + '...' : rawTx?.data
             }
-            const errorMessage = `${message}, error(error=${JSON.stringify(data?.error)}, payload=${response?.config?.data}, sender=${unSignTransaction.from}, to=${unSignTransaction?.to}, tx=${JSON.stringify(rawTx ?? {})})`
+            const errorMessage = `${message}, error(code=${code}, error=${JSON.stringify(data?.error)}, payload=${response?.config?.data}, sender=${unSignTransaction.from}, to=${unSignTransaction?.to}, tx=${JSON.stringify(rawTx ?? {})})`
             // Transactions sent from system addresses are not allowed to be abnormal
             if (unSignTransaction.from.toLowerCase() == this.sysAddress.toLowerCase()) {
                 throw new Error(errorMessage)
@@ -169,12 +175,13 @@ export class XvmService {
         }
         try {
             const tx = ethers.Transaction.from(signTransaction)
-            if (!ethers.isAddress(tx.from)) {
+            if (!tx.from) {
                 this.logger.warn(`Invalid signature address`)
                 return null
             }
-            if (!ethers.isAddress(tx.to)) {
+            if (!tx.to) {
                 this.logger.warn(`Invalid to address. toAddress: ${tx?.to} sender: ${tx.from}`)
+                return null
             }
             return tx
         } catch (error) {

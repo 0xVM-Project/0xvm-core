@@ -1,8 +1,8 @@
 export interface IProtocol<I, C> {
-    filterInscription(ordiInscriptionsContent: I): I | null
+    filterInscription(inscriptions: I): I | null
     decodeInscription(inscriptionContent: string): Array<C>
     executeTransaction(inscription: I): Promise<Array<string>>
-    encodeInscription(inscriptionArray: Array<C>): string
+    encodeInscription(inscriptionArray: Array<C>): string | null
 
     /** protocol action
     **  deploy = 1,
@@ -12,12 +12,12 @@ export interface IProtocol<I, C> {
     **  withdraw = 5
     */
 
-    deploy(data: string, inscription: I): Promise<string>
-    execute(data: string, inscription: I): Promise<string>
-    transfer(data: string, inscription: I): Promise<string>
-    deposit(data: string, inscription: I): Promise<string>
-    withdraw(data: string, inscription: I): Promise<string>
-    prev(data: string, inscription: I): Promise<string>
-    mineBlock(data: string, inscription: I): Promise<string>
+    deploy(data: string, inscription: I): Promise<string | null>
+    execute(data: string, inscription: I): Promise<string | null>
+    transfer(data: string, inscription: I): Promise<string | null>
+    deposit(data: string, inscription: I): Promise<string | null>
+    withdraw(data: string, inscription: I): Promise<string | null>
+    prev(data: string, inscription: I): Promise<string | null>
+    mineBlock(data: string, inscription: I): Promise<string | null>
     isPrecomputeInscription(inscriptionContent: string): { isPrecompute: boolean, mineTimestamp: number, prevHash: string }
 }

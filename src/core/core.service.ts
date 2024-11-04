@@ -135,7 +135,7 @@ export class CoreService {
         const message = `Block [${blockHeight}/${this.latestBlockHeightForBtc}] Total:${allInscriptionCount} 0xvm:${inscriptionList.length} RemainingBlock:${remainingBlock} Progress:${progressRate}%`
         this.logger.log(message)
         const hashList: string[] = []
-        let lastTransactionHash = ""
+        let lastTransactionHash: string = ''
         for (let index = 0; index < inscriptionList.length; index++) {
             const inscription = inscriptionList[index];
             const _hashList = await this.routerService.from(inscription.content).executeTransaction(inscription)
@@ -158,54 +158,57 @@ export class CoreService {
     }
 
     async sync() {
-        let latestBlockHeightForBtc = await this.indexerService.getLatestBlockNumberForBtc()
-        // sync Sequencer
-        const latestHistoryTx = await this.btcHistoryTxRepository.findOne({
-            where: {},
-            order: { blockHeight: 'DESC' },
-        })
-        let processBlockHeight = latestHistoryTx ? latestHistoryTx.blockHeight + 1 : this.defaultConf.xvm.firstInscriptionBlockHeight
-        const schedule = {
-            startTime: Math.floor((Date.now()) / 1000),
-            startBlockHeight: processBlockHeight,
-            endBlockHeight: latestBlockHeightForBtc,
-            processBlockHeight: processBlockHeight,
-            estimatedRemainingSeconds: 0
-        }
-        while (true) {
-            if (processBlockHeight > latestBlockHeightForBtc) {
-                const { result: latestBlockBy0xvm } = await this.xvmService.getLatestBlock()
-                const latestBlockTimestampBy0xvm = parseInt(latestBlockBy0xvm.timestamp.slice(2), 16)
-                const latestBlockHeightBy0xvm = parseInt(latestBlockBy0xvm.number.slice(2), 16)
-                if (latestBlockHeightBy0xvm == 0) {
-                    break
-                }
-                const latestHistoryTx = await this.btcHistoryTxRepository.findOne({
-                    where: {},
-                    order: { sort: 'DESC' },
-                })
-                if (latestBlockTimestampBy0xvm == latestHistoryTx.blockTimestamp) {
-                    break
-                } else {
-                    this.logger.log(`0xvm still has transactions to be broadcasted, wait 30 seconds to continue checking`)
-                    // sleep 30s
-                    await sleep(30000)
-                    latestBlockHeightForBtc = await this.indexerService.getLatestBlockNumberForBtc()
-                    continue
-                }
-            }
-            // let savedRow = 0
-            const savedRow = await this.sequencerService.syncSequencer(processBlockHeight)
-            if (latestBlockHeightForBtc - processBlockHeight <= 1) {
-                latestBlockHeightForBtc = await this.indexerService.getLatestBlockNumberForBtc()
-            }
-            schedule.processBlockHeight = processBlockHeight
-            schedule.endBlockHeight = latestBlockHeightForBtc
-            schedule.estimatedRemainingSeconds = Math.floor((schedule.processBlockHeight - schedule.startBlockHeight) / ((Math.floor(Date.now() / 1000)) - schedule.startTime) * (schedule.endBlockHeight - schedule.processBlockHeight))
-            let timeleft = `${Math.floor(schedule.estimatedRemainingSeconds / 3600)}:${Math.floor((schedule.estimatedRemainingSeconds % 3600) / 60)}:${schedule.estimatedRemainingSeconds % 60}`
-            this.logger.log(`Sync saved ${processBlockHeight}/${latestBlockHeightForBtc} Inscription-Nums: ${savedRow} Time-left ${timeleft}`)
-            processBlockHeight += 1
-        }
+        // let latestBlockHeightForBtc = await this.indexerService.getLatestBlockNumberForBtc()
+        // // sync Sequencer
+        // const latestHistoryTx = await this.btcHistoryTxRepository.findOne({
+        //     where: {},
+        //     order: { blockHeight: 'DESC' },
+        // })
+        // let processBlockHeight = latestHistoryTx ? latestHistoryTx.blockHeight + 1 : this.defaultConf.xvm.firstInscriptionBlockHeight
+        // const schedule = {
+        //     startTime: Math.floor((Date.now()) / 1000),
+        //     startBlockHeight: processBlockHeight,
+        //     endBlockHeight: latestBlockHeightForBtc,
+        //     processBlockHeight: processBlockHeight,
+        //     estimatedRemainingSeconds: 0
+        // }
+        // while (true) {
+        //     if (processBlockHeight > latestBlockHeightForBtc) {
+        //         const { result: latestBlockBy0xvm } = await this.xvmService.getLatestBlock()
+        //         const latestBlockTimestampBy0xvm = parseInt(latestBlockBy0xvm.timestamp.slice(2), 16)
+        //         const latestBlockHeightBy0xvm = parseInt(latestBlockBy0xvm.number.slice(2), 16)
+        //         if (latestBlockHeightBy0xvm == 0) {
+        //             break
+        //         }
+        //         const latestHistoryTx = await this.btcHistoryTxRepository.findOne({
+        //             where: {},
+        //             order: { sort: 'DESC' },
+        //         })
+        //         if (!latestHistoryTx) {
+        //             throw new Error(`The {{btcHistoryTxRepository}} table data is abnormal and the data is empty`)
+        //         }
+        //         if (latestBlockTimestampBy0xvm == latestHistoryTx.blockTimestamp) {
+        //             break
+        //         } else {
+        //             this.logger.log(`0xvm still has transactions to be broadcasted, wait 30 seconds to continue checking`)
+        //             // sleep 30s
+        //             await sleep(30000)
+        //             latestBlockHeightForBtc = await this.indexerService.getLatestBlockNumberForBtc()
+        //             continue
+        //         }
+        //     }
+        //     // let savedRow = 0
+        //     const savedRow = await this.sequencerService.syncSequencer(processBlockHeight)
+        //     if (latestBlockHeightForBtc - processBlockHeight <= 1) {
+        //         latestBlockHeightForBtc = await this.indexerService.getLatestBlockNumberForBtc()
+        //     }
+        //     schedule.processBlockHeight = processBlockHeight
+        //     schedule.endBlockHeight = latestBlockHeightForBtc
+        //     schedule.estimatedRemainingSeconds = Math.floor((schedule.processBlockHeight - schedule.startBlockHeight) / ((Math.floor(Date.now() / 1000)) - schedule.startTime) * (schedule.endBlockHeight - schedule.processBlockHeight))
+        //     let timeleft = `${Math.floor(schedule.estimatedRemainingSeconds / 3600)}:${Math.floor((schedule.estimatedRemainingSeconds % 3600) / 60)}:${schedule.estimatedRemainingSeconds % 60}`
+        //     this.logger.log(`Sync saved ${processBlockHeight}/${latestBlockHeightForBtc} Inscription-Nums: ${savedRow} Time-left ${timeleft}`)
+        //     processBlockHeight += 1
+        // }
 
         // Execution of synchronised transactions
         let nextSort = 0
@@ -226,7 +229,7 @@ export class CoreService {
                 this.logger.log(`↪ Execution of synchronised transactions success. ↩`)
                 break
             }
-            nextSort = history.at(history.length - 1).sort
+            nextSort = history[history.length - 1].sort
             // execution inscription
             for (let index = 0; index < history.length; index++) {
                 const record = history[index]
@@ -236,7 +239,8 @@ export class CoreService {
                     inscriptionId: `${record.hash}i0`,
                     contentType: 'text/plain',
                     contentLength: record.content.length,
-                    content: record.content
+                    content: record.content,
+                    hash: record.hash
                 }
                 const hashList = await this.routerService.from(inscription.content).executeTransaction(inscription)
                 this.logger.log(`Sync tx execution ${hashList.length} for ${record.blockHeight}`)
@@ -273,12 +277,12 @@ export class CoreService {
         await this.sync()
         // await this.execution()
     }
-    
+
     async execution() {
         this.logger.log("Run start")
         let retryTotal = 0
 
-        if(this.latestBlockHeightForBtc && this.latestBlockHeightForXvm && this.latestBlockHeightForBtc > 0 && this.latestBlockHeightForXvm > 0){
+        if (this.latestBlockHeightForBtc && this.latestBlockHeightForXvm && this.latestBlockHeightForBtc > 0 && this.latestBlockHeightForXvm > 0) {
             let latestBlockHeightForXvm = this.latestBlockHeightForBtc
 
             while (true) {
@@ -302,11 +306,11 @@ export class CoreService {
                         }
 
                         retryTotal = 0
-                    }else if(this.latestBlockHeightForBtc === latestBlockHeightForXvm){
+                    } else if (this.latestBlockHeightForBtc === latestBlockHeightForXvm) {
                         this.logger.log(`[${this.latestBlockHeightForXvm}/${this.latestBlockHeightForBtc}] Waiting for new blocks`)
                         await sleep(10000)
                         continue
-                    }else{
+                    } else {
                         break
                     }
                 } catch (error) {
@@ -316,18 +320,18 @@ export class CoreService {
                     await sleep(2000 + 2000 * retryTotal)
                 }
             }
-        }else{
+        } else {
             this.logger.log("Run Invalid latestBlockHeightForXvm, skip");
         }
     }
-    
+
     async normalExecution() {
         const finalBlockHeightForXvm = await this.getFinalBlock(
-          this.latestBlockHeightForXvm,
+            this.latestBlockHeightForXvm,
         );
         const processBlockHeightForXvm = finalBlockHeightForXvm + 1;
         const processBlockHashForXvm = await this.processBlock(
-          processBlockHeightForXvm,
+            processBlockHeightForXvm,
         );
         await this.snapshotBlock(processBlockHeightForXvm, processBlockHashForXvm);
         return processBlockHeightForXvm;

@@ -39,7 +39,8 @@ describe('ProtocolService', () => {
       inscriptionId: 'ba6307750d57b99a5ffa0bac2b1fd7efc5953d8f094bf56bcbd298c5e621a61bi0',
       contentType: '',
       contentLength: inscriptionContent.length,
-      content: inscriptionContent
+      content: inscriptionContent,
+      hash: 'ba6307750d57b99a5ffa0bac2b1fd7efc5953d8f094bf56bcbd298c5e621a61b'
     }
     const txHashList = await service.from(inscriptionContent).executeTransaction(inscription)
     console.log(`txHashList:${JSON.stringify(txHashList, null, 2)}`)
@@ -51,7 +52,8 @@ describe('ProtocolService', () => {
       inscriptionId: 'f5bae178e3ec56de4c2c26d2b0fea6aab2ef0a3ad5cb6c177772722133cdcea5i0',
       contentType: '',
       contentLength: inscriptionContent.length,
-      content: inscriptionContent
+      content: inscriptionContent,
+      hash: 'f5bae178e3ec56de4c2c26d2b0fea6aab2ef0a3ad5cb6c177772722133cdcea5'
     }
     const txHashList = await service.from(inscriptionContent).executeTransaction(inscription)
     console.log(`txHashList:${JSON.stringify(txHashList, null, 2)}`)
@@ -63,7 +65,8 @@ describe('ProtocolService', () => {
       inscriptionId: '6e25fcb8ca01f63203de7b2e568d87a1bb198c427d5edf67d6f0f7494b377113i0',
       contentType: '',
       contentLength: inscriptionContent.length,
-      content: inscriptionContent
+      content: inscriptionContent,
+      hash: '6e25fcb8ca01f63203de7b2e568d87a1bb198c427d5edf67d6f0f7494b377113'
     }
     const txHashList = await service.from(inscriptionContent).executeTransaction(inscription)
     console.log(`txHashList:${JSON.stringify(txHashList, null, 2)}`)

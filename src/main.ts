@@ -18,7 +18,7 @@ async function bootstrap() {
     const address = server.address()
     const ipv4 = Object.values(os.networkInterfaces())
       .flatMap(iface => iface)
-      .find(iface => iface.family === 'IPv4' && !iface.internal);
+      .find(iface => iface?.family === 'IPv4' && !iface.internal);
     const ipAddress = ipv4 ? ipv4.address : address.address;
     logger.log(`App is running on: http://${ipAddress}:${address.port}`)
   });

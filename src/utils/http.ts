@@ -1,3 +1,3 @@
-export function removeTrailingSlash(url: string | undefined): string {
+export function removeTrailingSlash(url: string): string {
     return url ? url.replace(/\/$/, '') : url
 }

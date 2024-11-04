@@ -97,6 +97,7 @@ export class PreExecutionService {
             contentType: '',
             contentLength: 0,
             content,
+            hash: '0000000000000000000000000000000000000000000000000000000000000000'
           };
           const hashList = await protocol.executeTransaction(inscription);
 

@@ -47,12 +47,15 @@ describe('OrdService', () => {
     const { result: { tx } } = await btcApiService.getBlock(hash)
     for (const t of tx) {
       const txid = t.txid
-      const txinwitness = t.vin.at(0).txinwitness
+      const txinwitness = t.vin.at(0)!.txinwitness
       const data = service.getInscriptionContentData(txid, txinwitness)
+      if (!data) {
+        return new Error(`data invalid`)
+      }
       if (data.contentLength > 0 && data.content.startsWith('0f0001')) {
         console.log(`length: ${data.contentLength} content(6): ${data.content}`)
       }
-      if(data.contentLength==0){
+      if (data.contentLength == 0) {
         console.log(`length: ${data.contentLength} content(6): ${data.content}`)
       }
     }
