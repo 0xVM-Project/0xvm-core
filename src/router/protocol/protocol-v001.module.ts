@@ -12,7 +12,7 @@ import { SqliteModule } from 'src/common/sqlite/sqlite.module';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([BlockHashSnapshot, BtcHistoryTx]),
+        TypeOrmModule.forFeature([BlockHashSnapshot]),
         SqliteModule,
         WithdrawModule,
         HashMappingModule,

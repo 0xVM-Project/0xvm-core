@@ -2,12 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 
 export interface Inscription {
     blockHeight?: number
-    inscriptionId: string
+    inscriptionId?: string
     contentType: string
     contentLength: number
     content: string
     timestamp?: number
-    hash?: string;
+    hash: string;
 }
 
 @Injectable()
@@ -18,9 +18,9 @@ export class InscriptionService {
 
     private parse(txinWitness: string[]) {
         let rawWitness: Buffer
-        let contentStart: number
+        let contentStart: number = 0
         let contentType: string = ''
-        let isInscription: boolean
+        let isInscription: boolean = false
         let data = {
             contentType: '',
             contentLength: 0,
@@ -71,7 +71,8 @@ export class InscriptionService {
             inscriptionId: `${txid}i0`,
             contentType: contentType,
             contentLength: contentLength,
-            content: rawContentData.toString('utf8')
+            content: rawContentData.toString('utf8'),
+            hash: txid
         } as Inscription
     }
 
@@ -84,7 +85,8 @@ export class InscriptionService {
             inscriptionId: `${txid}i0`,
             contentType: contentType,
             contentLength: contentLength,
-            content: rawContentData.toString('hex')
+            content: rawContentData.toString('hex'),
+            hash: txid
         } as Inscription
     }
 

@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ethers } from 'ethers';
 import defaultConfig from 'src/config/default.config';
 import { BtcHistoryTx } from 'src/entities/sqlite-entities/btc-history-tx.entity';
 import { IndexerService } from 'src/indexer/indexer.service';
@@ -44,6 +45,8 @@ export class SequencerService {
             if (!protocolService.filterInscription(inscription)) {
                 continue
             }
+            // 9ecaec4178f8869dda136727618a658f8c87e9fcbb9c4ed986b156cba7ee2961
+            // 0x0000000000000000000000000000000000000000000000000000000000000000
             const { isPrecompute, mineTimestamp, prevHash } = protocolService.isPrecomputeInscription(inscription.content)
             actualSerialNumber += 1
             let newSort = Number(`${actualSerialNumber}0`)
@@ -52,20 +55,27 @@ export class SequencerService {
             if (isPrecompute) {
                 actualSerialNumber -= 1
                 // Verify that precompute inscription is valid
-                const inscriptionGenesisAddress = await this.indexerService.getGenesisInscriptionAddress(inscription.inscriptionId)
+                const inscriptionGenesisAddress = await this.indexerService.getGenesisInscriptionAddress(inscription.hash)
                 if (inscriptionGenesisAddress != this.defaultConf.xvm.sysBtcAddress) {
                     this.logger.warn(`Invalid pre-execution inscription, not created by 0xvm`)
                     continue
                 }
-                const precomputePrevHistoryTx = await this.btcHistoryTxRepository.findOne({ where: { hash: prevHash } })
-                newSort = Number(`${this.getActualSort(precomputePrevHistoryTx.sort) + 1}1`)
+                if (ethers.ZeroHash.slice(2) == prevHash || ethers.ZeroHash == prevHash) {
+                    newSort = 11
+                } else {
+                    const precomputePrevHistoryTx = await this.btcHistoryTxRepository.findOne({ where: { hash: prevHash } })
+                    if (!precomputePrevHistoryTx) {
+                        throw new Error(`prevHash{ ${prevHash} } is invalid or does not exist`)
+                    }
+                    newSort = Number(`${this.getActualSort(precomputePrevHistoryTx.sort) + 1}1`)
+                }
                 timestamp = mineTimestamp
             }
             dataList.push({
-                blockHeight: inscription.blockHeight,
+                blockHeight: blockHeight,
                 blockTimestamp: timestamp,
                 version: inscription.content.slice(0, 6),
-                hash: inscription.inscriptionId.slice(0, -2),
+                hash: inscription.hash,
                 content: inscription.content,
                 prev: prevHash,
                 sort: newSort,

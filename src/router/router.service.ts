@@ -3,10 +3,14 @@ import { ProtocolVersionEnum } from './router.enum';
 import { ProtocolV001Service } from './protocol/protocol-v001.service';
 import { ProtNotValidService as NotValidProtocolService } from './prot-not-valid.service';
 import { IProtocol } from './router.interface';
+import { IndexerService } from 'src/indexer/indexer.service';
+import { ProtocolBase } from './protocol/protocol-base';
+import { Inscription } from 'src/ord/inscription.service';
+import { BaseCommandsType } from './interface/protocol.interface';
 
 @Injectable()
 export class RouterService {
-    public readonly handlers: Record<ProtocolVersionEnum, ProtocolV001Service>
+    public readonly handlers: Record<ProtocolVersionEnum, ProtocolBase<Inscription, BaseCommandsType>>
 
     constructor(
         private readonly notValidProtocolService: NotValidProtocolService,
@@ -17,11 +21,12 @@ export class RouterService {
             [ProtocolVersionEnum['0f0002']]: this.protV001Service,
         }
     }
-    
-    from(inscriptionContent: string): IProtocol<any, any> {
+
+    from(inscriptionContent: string): ProtocolBase<Inscription, BaseCommandsType> {
         const version = inscriptionContent.slice(0, 6)
         if (version in this.handlers) {
-            return this.handlers[version]
+            const protocolVersion = version as ProtocolVersionEnum;
+            return this.handlers[protocolVersion]
         } else {
             return this.notValidProtocolService
         }

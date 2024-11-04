@@ -51,7 +51,7 @@ export class OrdService {
 
     async getInscriptionTxOutput(txid: string, index = 1): Promise<BlockTxOutput | null> {
         if (this.outputFor0xvm && txid in this.outputFor0xvm && this.outputFor0xvm[txid].length > index) {
-            return this.outputFor0xvm[txid].at(index)
+            return this.outputFor0xvm[txid].at(index) ?? null
         } else {
             const { result } = await this.btcrpcService.getRawtransaction(txid)
             const vout = result.vout

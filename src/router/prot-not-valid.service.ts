@@ -1,24 +1,23 @@
 import { Injectable } from '@nestjs/common';
 import { ProtocolBase } from './protocol/protocol-base';
+import { Inscription } from 'src/ord/inscription.service';
+import { BaseCommandsType } from './interface/protocol.interface';
 
 @Injectable()
-export class ProtNotValidService extends ProtocolBase<any, any> {
-    saveInscriptionToSqlite(inscriptionList: any[]) {
-        return null
-    }
-    filterInscription(ordiInscriptionsContent: any) {
+export class ProtNotValidService extends ProtocolBase<Inscription, BaseCommandsType> {
+    filterInscription(inscription: Inscription): Inscription | null {
         return null
     }
 
-    decodeInscription(inscriptionContent: string) {
-        return null
+    decodeInscription(inscriptionContent: string): Array<BaseCommandsType> {
+        return []
     }
 
-    executeTransaction(inscription: any) {
-        return null
+    async executeTransaction(inscription: any): Promise<Array<string>> {
+        return []
     }
 
-    encodeInscription(inscription: any) {
+    encodeInscription(inscription: any): string | null {
         return null
     }
 
@@ -32,13 +31,13 @@ export class ProtNotValidService extends ProtocolBase<any, any> {
     **  mineBlock = 6
     */
 
-    prev(inscriptionCommand: any) { return null }
-    mineBlock(inscriptionCommand: any) { return null }
-    deploy(inscriptionCommand: any) { return null }
-    execute(inscriptionCommand: any) { return null }
-    transfer(inscriptionCommand: any) { return null }
-    deposit(inscriptionCommand: any) { return null }
-    withdraw(inscriptionCommand: any) { return null }
+    async prev(data: string, inscription: Inscription): Promise<string | null> { return null }
+    async mineBlock(data: string, inscription: Inscription): Promise<string | null> { return null }
+    async deploy(data: string, inscription: Inscription): Promise<string | null> { return null }
+    async execute(data: string, inscription: Inscription): Promise<string | null> { return null }
+    async transfer(data: string, inscription: Inscription): Promise<string | null> { return null }
+    async deposit(data: string, inscription: Inscription): Promise<string | null> { return null }
+    async withdraw(data: string, inscription: Inscription): Promise<string | null> { return null }
 
-    isPrecomputeInscription(inscriptionContent: string) { return null }
+    isPrecomputeInscription(inscriptionContent: string): { isPrecompute: boolean, mineTimestamp: number, prevHash: string } { return { isPrecompute: false, mineTimestamp: 0, prevHash: '' } }
 }

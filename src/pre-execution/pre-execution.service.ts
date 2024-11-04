@@ -58,6 +58,7 @@ export class PreExecutionService {
             contentType: '',
             contentLength: 0,
             content,
+            hash: '0000000000000000000000000000000000000000000000000000000000000000'
           };
           const hashList = await this.routerService
             .from(content)
