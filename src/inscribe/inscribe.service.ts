@@ -1,5 +1,5 @@
 import { HttpService } from '@nestjs/axios';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Transaction } from 'bitcoinjs-lib';
@@ -8,6 +8,7 @@ import defaultConfig from 'src/config/default.config';
 import { HashMapping } from 'src/entities/hash-mapping.entity';
 import { LastTxHash } from 'src/entities/last-tx-hash.entity';
 import { PreBroadcastTx } from 'src/entities/pre-broadcast-tx.entity';
+import { BTCTransaction } from 'src/utils/btc-transaction';
 import { createCommit, createReveal, relay } from 'src/utils/inscribe';
 import { Repository } from 'typeorm';
 import {
@@ -20,6 +21,8 @@ import {
 
 @Injectable()
 export class InscribeService {
+  private readonly logger = new Logger(InscribeService.name);
+
   constructor(
     @InjectRepository(PreBroadcastTx)
     private readonly preBroadcastTx: Repository<PreBroadcastTx>,
@@ -32,7 +35,7 @@ export class InscribeService {
     private readonly httpService: HttpService,
   ) {}
 
-  async create(request: CreateRequest): Promise<CreateResponse> {
+  async create(request: CreateRequest, id: number): Promise<CreateResponse> {
     const { payPrivateKey, payAddress, amount } = await createCommit(
       request.content,
       request.receiverAddress,
@@ -42,16 +45,18 @@ export class InscribeService {
 
     const inscribe_id = crypto.randomUUID();
 
-    const inscribeItem = this.preBroadcastTx.create({
-      inscribeId: inscribe_id,
-      privateKey: payPrivateKey,
-      content: request.content,
-      receiverAddress: request.receiverAddress,
-      feeRate: request.feeRate,
-      depositAmount: request.depositAmount,
-      commitTx: '',
-    });
-    this.preBroadcastTx.save(inscribeItem);
+    await this.preBroadcastTx.update(
+      { id },
+      {
+        inscribeId: inscribe_id,
+        privateKey: payPrivateKey,
+        content: request.content,
+        receiverAddress: request.receiverAddress,
+        feeRate: request.feeRate,
+        depositAmount: request.depositAmount,
+        commitTx: '',
+      },
+    );
 
     return {
       id: inscribe_id,
@@ -61,20 +66,20 @@ export class InscribeService {
   }
 
   async commit(request: CommitRequest) {
-    const inscribeItem = await this.preBroadcastTx.findOne({
-      where: [{ inscribeId: request.id }],
+    const preBroadcastTx = await this.preBroadcastTx.findOne({
+      where: [{ id: request.id }],
     });
 
-    if (!inscribeItem) {
+    if (!preBroadcastTx) {
       throw new Error('Commit inscribe param error, invalid id: ' + request.id);
     }
 
     const revealResult = await createReveal(
-      inscribeItem.privateKey,
-      inscribeItem.content,
-      inscribeItem.receiverAddress,
-      inscribeItem.feeRate,
-      inscribeItem.depositAmount,
+      preBroadcastTx.privateKey,
+      preBroadcastTx.content,
+      preBroadcastTx.receiverAddress,
+      preBroadcastTx.feeRate,
+      preBroadcastTx.depositAmount,
       request.tx,
     );
 
@@ -84,22 +89,26 @@ export class InscribeService {
         await relay(request.tx);
         await relay(revealResult.signedTx);
         const lastTxHash = await this.lastTxHash.findOne({});
-        inscribeItem.commitTx = request.tx;
-        inscribeItem.commitTxHash = Transaction.fromHex(request.tx).getId();
-        inscribeItem.revealHash = revealResult.txHash;
-        inscribeItem.status = 3;
-        inscribeItem.previous = lastTxHash?.hash ?? '';
-        this.preBroadcastTx.save(inscribeItem);
+        await this.preBroadcastTx.update(
+          { id: request.id },
+          {
+            commitTx: request.tx,
+            commitTxHash: Transaction.fromHex(request.tx).getId(),
+            revealHash: revealResult.txHash,
+            status: 3,
+            previous: lastTxHash?.hash ?? '',
+          },
+        );
         this.lastTxHash.update(
           {},
           {
             hash: revealResult.txHash,
           },
         );
-        this.hashMappingRepository.update(
-          { xvmHash: inscribeItem.xvmBlockHash },
-          { btcHash: revealResult.txHash },
-        );
+        // this.hashMappingRepository.update(
+        //   { xvmHash: inscribeItem.xvmBlockHash },
+        //   { btcHash: revealResult.txHash },
+        // );
       } catch (e) {
         throw new Error(
           'Commit inscribe param error, failed to relay tx: ' + e,
@@ -146,7 +155,7 @@ export class InscribeService {
 
         if (pendingTx) {
           const txHash = await this.commit({
-            id: pendingTx?.inscribeId,
+            id: pendingTx?.id,
             tx: pendingTx?.commitTx,
           });
         }
@@ -161,7 +170,30 @@ export class InscribeService {
         });
 
         if (readyTx) {
-          // todo: transfer and commit
+          const bTCTransaction = new BTCTransaction(
+            this.defaultConf.xvm.operatorPrivateKey,
+          );
+          const transferResult = await bTCTransaction.transfer(
+            readyTx.receiverAddress,
+            readyTx.depositAmount,
+            feeRate,
+          );
+          if (transferResult && transferResult?.txid) {
+            try {
+              await this.preBroadcastTx.update(
+                { id: readyTx?.id },
+                { status: 2 },
+              );
+            } catch (error) {
+              this.logger.error('update preBroadcastTx failed');
+              throw error;
+            }
+
+            const txHash = await this.commit({
+              id: readyTx?.id,
+              tx: transferResult?.txid,
+            });
+          }
         }
 
         const initialTx = await this.preBroadcastTx.findOne({
@@ -174,14 +206,50 @@ export class InscribeService {
         });
 
         if (initialTx) {
-          const txData = await this.create({
-            content: initialTx?.content,
-            receiverAddress: this.defaultConf.xvm.sysBtcAddress,
-            feeRate,
-          });
+          const txData = await this.create(
+            {
+              content: initialTx?.content,
+              receiverAddress: this.defaultConf.xvm.sysBtcAddress,
+              feeRate,
+            },
+            initialTx?.id,
+          );
 
           if (txData) {
-            // todo: transfer and commit
+            try {
+              await this.preBroadcastTx.update(
+                { id: initialTx?.id },
+                { status: 1 },
+              );
+            } catch (error) {
+              this.logger.error('update preBroadcastTx failed');
+              throw error;
+            }
+
+            const bTCTransaction = new BTCTransaction(
+              this.defaultConf.xvm.operatorPrivateKey,
+            );
+            const transferResult = await bTCTransaction.transfer(
+              txData.address,
+              txData.amount,
+              feeRate,
+            );
+            if (transferResult && transferResult?.txid) {
+              try {
+                await this.preBroadcastTx.update(
+                  { id: initialTx?.id },
+                  { status: 2 },
+                );
+              } catch (error) {
+                this.logger.error('update preBroadcastTx failed');
+                throw error;
+              }
+
+              const txHash = await this.commit({
+                id: initialTx?.id,
+                tx: transferResult?.txid,
+              });
+            }
           }
         }
       }

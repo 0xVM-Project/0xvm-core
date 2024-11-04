@@ -144,8 +144,7 @@ export class CoreService {
         }
         // preExecution update: save last transaction hash to database for preExecution
         try {
-            const saveData = this.lastTxHash.create({ hash: lastTransactionHash})
-            await this.lastTxHash.save(saveData) 
+            await this.lastTxHash.update({},{ hash: lastTransactionHash})
         } catch (error) {
             this.logger.error("add lastTxHsh failed")
             throw error
@@ -272,6 +271,7 @@ export class CoreService {
     async run() {
         // 1. sync history tx
         await this.sync()
+        // await this.execution()
     }
     
     async execution() {
@@ -289,8 +289,18 @@ export class CoreService {
                     }
 
                     if(this.latestBlockHeightForBtc === latestBlockHeightForXvm + 1){
-                        await this.normalExecution()
-                        await this.preExecution()
+                        const lastTxHash = await this.lastTxHash.findOne({});
+
+                        if(!lastTxHash){
+                            await this.lastTxHash.save(this.lastTxHash.create())
+                        }
+
+                        const finalBlockHeightForXvm = await this.normalExecution()
+
+                        if(finalBlockHeightForXvm){
+                            await this.preExecution(finalBlockHeightForXvm+1)
+                        }
+
                         retryTotal = 0
                     }else if(this.latestBlockHeightForBtc === latestBlockHeightForXvm){
                         this.logger.log(`[${this.latestBlockHeightForXvm}/${this.latestBlockHeightForBtc}] Waiting for new blocks`)
@@ -320,10 +330,12 @@ export class CoreService {
           processBlockHeightForXvm,
         );
         await this.snapshotBlock(processBlockHeightForXvm, processBlockHashForXvm);
-        return true;
+        return processBlockHeightForXvm;
       }
     
-      async preExecution() {
-        this.preExecutionService.execute();        // 1. sync history tx
+      async preExecution(finalBlockHeightForXvm:number) {
+        if(finalBlockHeightForXvm){
+            this.preExecutionService.execute(finalBlockHeightForXvm); 
+        }
       }
 }

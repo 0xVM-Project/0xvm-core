@@ -9,7 +9,7 @@ import {
 @Entity('last_tx_hash')
 export class LastTxHash {
   @PrimaryGeneratedColumn()
-  id: number;
+  id?: number;
 
   @Column({
     name: 'hash',
