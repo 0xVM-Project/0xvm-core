@@ -6,7 +6,7 @@ export interface CreateRequest {
 }
 
 export interface CommitRequest {
-  id: string;
+  id: number;
   tx: string;
 }
 
