@@ -41,7 +41,7 @@ export class PreBroadcastTx {
     nullable: false,
     default: 0,
     unsigned: true,
-    comment: '0: initial 1: ready 2: pending 3: completed',
+    comment: '0: initial 1: packed 2: ready 3: pending 4: completed',
   })
   @Index()
   status: number;
@@ -116,6 +116,18 @@ export class PreBroadcastTx {
   })
   @Index()
   previous: string;
+
+  @Column({
+    name: 'xvm_block_hash',
+    type: 'varchar',
+    length: 256,
+    nullable: false,
+    default: '',
+    charset: 'utf8mb4',
+    collation: 'utf8mb4_general_ci',
+  })
+  @Index()
+  xvmBlockHash: string;
 
   @Column({
     name: 'reveal_hash',

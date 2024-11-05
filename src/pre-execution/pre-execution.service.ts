@@ -54,7 +54,6 @@ export class PreExecutionService {
       }
 
       if (
-        isInscriptionEnd &&
         decodeInscriptionList &&
         decodeInscriptionList?.length > 0 &&
         availablePreTransactionList &&
@@ -78,12 +77,20 @@ export class PreExecutionService {
         const content = protocol.encodeInscription(txList);
 
         try {
-          const preBroadcastTx = await this.preBroadcastTx.save(
-            this.preBroadcastTx.create({ content }),
-          );
+          const packagePreBroadcastTx = await this.preBroadcastTx.findOne({
+            where: { status: 1 },
+          });
 
-          if (preBroadcastTx && preBroadcastTx?.id) {
-            preBroadcastTxId = preBroadcastTx.id;
+          if (packagePreBroadcastTx) {
+            preBroadcastTxId = packagePreBroadcastTx?.id;
+          } else {
+            const preBroadcastTx = await this.preBroadcastTx.save(
+              this.preBroadcastTx.create({}),
+            );
+
+            if (preBroadcastTx && preBroadcastTx?.id) {
+              preBroadcastTxId = preBroadcastTx.id;
+            }
           }
         } catch (error) {
           this.logger.error('add preBroadcastTx failed');
@@ -99,7 +106,10 @@ export class PreExecutionService {
             content,
             hash: '0000000000000000000000000000000000000000000000000000000000000000',
           };
-          const hashList = await protocol.executeTransaction(inscription);
+          const hashList = await protocol.executeTransaction(
+            inscription,
+            isInscriptionEnd,
+          );
 
           if (hashList && hashList?.length > 0) {
             try {
@@ -114,6 +124,13 @@ export class PreExecutionService {
               );
 
               if (result && result?.length > 0) {
+                if (isInscriptionEnd) {
+                  await this.preBroadcastTx.update(
+                    { id: preBroadcastTxId },
+                    { status: 1, xvmBlockHash: hashList[hashList.length - 1] },
+                  );
+                }
+
                 await this.pendingTx.update(
                   {
                     id: In(

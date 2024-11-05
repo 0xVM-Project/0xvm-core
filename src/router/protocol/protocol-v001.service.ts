@@ -111,7 +111,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
                 await this.hashMappingService.bindHash({
                     xFromAddress: xvmFrom ?? '',
                     xToAddress: xvmTo ?? '',
-                    btcHash: inscriptionHash,//todo: preExecution no inscriptionHash ?
+                    btcHash: inscriptionHash,
                     xvmHash: hash,
                     logIndex: logIndex
                 })

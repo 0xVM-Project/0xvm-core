@@ -7,7 +7,9 @@ import { firstValueFrom } from 'rxjs';
 import defaultConfig from 'src/config/default.config';
 import { HashMapping } from 'src/entities/hash-mapping.entity';
 import { LastTxHash } from 'src/entities/last-tx-hash.entity';
+import { PreBroadcastTxItem } from 'src/entities/pre-broadcast-tx-item.entity';
 import { PreBroadcastTx } from 'src/entities/pre-broadcast-tx.entity';
+import { RouterService } from 'src/router/router.service';
 import { BTCTransaction } from 'src/utils/btc-transaction';
 import { createCommit, createReveal, relay } from 'src/utils/inscribe';
 import { Repository } from 'typeorm';
@@ -30,9 +32,12 @@ export class InscribeService {
     private readonly lastTxHash: Repository<LastTxHash>,
     @InjectRepository(HashMapping)
     private readonly hashMappingRepository: Repository<HashMapping>,
+    @InjectRepository(PreBroadcastTxItem)
+    private readonly preBroadcastTxItem: Repository<PreBroadcastTxItem>,
     @Inject(defaultConfig.KEY)
     private readonly defaultConf: ConfigType<typeof defaultConfig>,
     private readonly httpService: HttpService,
+    private readonly routerService: RouterService,
   ) {}
 
   async create(request: CreateRequest, id: number): Promise<CreateResponse> {
@@ -88,15 +93,13 @@ export class InscribeService {
       try {
         await relay(request.tx);
         await relay(revealResult.signedTx);
-        const lastTxHash = await this.lastTxHash.findOne({});
         await this.preBroadcastTx.update(
           { id: request.id },
           {
             commitTx: request.tx,
             commitTxHash: Transaction.fromHex(request.tx).getId(),
             revealHash: revealResult.txHash,
-            status: 3,
-            previous: lastTxHash?.hash ?? '',
+            status: 4,
           },
         );
         this.lastTxHash.update(
@@ -105,10 +108,10 @@ export class InscribeService {
             hash: revealResult.txHash,
           },
         );
-        // this.hashMappingRepository.update(
-        //   { xvmHash: inscribeItem.xvmBlockHash },
-        //   { btcHash: revealResult.txHash },
-        // );
+        this.hashMappingRepository.update(
+          { xvmHash: preBroadcastTx.xvmBlockHash },
+          { btcHash: revealResult.txHash },
+        );
       } catch (e) {
         throw new Error(
           'Commit inscribe param error, failed to relay tx: ' + e,
@@ -146,7 +149,7 @@ export class InscribeService {
       if (feeRate && feeRate > 0 && feeRate <= 500) {
         const pendingTx = await this.preBroadcastTx.findOne({
           where: {
-            status: 2,
+            status: 3,
           },
           order: {
             id: 'ASC',
@@ -158,87 +161,30 @@ export class InscribeService {
             id: pendingTx?.id,
             tx: pendingTx?.commitTx,
           });
-        }
-
-        const readyTx = await this.preBroadcastTx.findOne({
-          where: {
-            status: 1,
-          },
-          order: {
-            id: 'ASC',
-          },
-        });
-
-        if (readyTx) {
-          const bTCTransaction = new BTCTransaction(
-            this.defaultConf.xvm.operatorPrivateKey,
-          );
-          const transferResult = await bTCTransaction.transfer(
-            readyTx.receiverAddress,
-            readyTx.depositAmount,
-            feeRate,
-          );
-          if (transferResult && transferResult?.txid) {
-            try {
-              await this.preBroadcastTx.update(
-                { id: readyTx?.id },
-                { status: 2 },
-              );
-            } catch (error) {
-              this.logger.error('update preBroadcastTx failed');
-              throw error;
-            }
-
-            const txHash = await this.commit({
-              id: readyTx?.id,
-              tx: transferResult?.txid,
-            });
-          }
-        }
-
-        const initialTx = await this.preBroadcastTx.findOne({
-          where: {
-            status: 0,
-          },
-          order: {
-            id: 'ASC',
-          },
-        });
-
-        if (initialTx) {
-          const txData = await this.create(
-            {
-              content: initialTx?.content,
-              receiverAddress: this.defaultConf.xvm.sysBtcAddress,
-              feeRate,
+        } else {
+          const readyTx = await this.preBroadcastTx.findOne({
+            where: {
+              status: 2,
             },
-            initialTx?.id,
-          );
+            order: {
+              id: 'ASC',
+            },
+          });
 
-          if (txData) {
-            try {
-              await this.preBroadcastTx.update(
-                { id: initialTx?.id },
-                { status: 1 },
-              );
-            } catch (error) {
-              this.logger.error('update preBroadcastTx failed');
-              throw error;
-            }
-
+          if (readyTx) {
             const bTCTransaction = new BTCTransaction(
               this.defaultConf.xvm.operatorPrivateKey,
             );
             const transferResult = await bTCTransaction.transfer(
-              txData.address,
-              txData.amount,
+              readyTx.receiverAddress,
+              readyTx.depositAmount,
               feeRate,
             );
             if (transferResult && transferResult?.txid) {
               try {
                 await this.preBroadcastTx.update(
-                  { id: initialTx?.id },
-                  { status: 2 },
+                  { id: readyTx?.id },
+                  { status: 3 },
                 );
               } catch (error) {
                 this.logger.error('update preBroadcastTx failed');
@@ -246,9 +192,104 @@ export class InscribeService {
               }
 
               const txHash = await this.commit({
-                id: initialTx?.id,
+                id: readyTx?.id,
                 tx: transferResult?.txid,
               });
+            }
+          } else {
+            const initialTx = await this.preBroadcastTx.findOne({
+              where: {
+                status: 1,
+              },
+              order: {
+                id: 'ASC',
+              },
+            });
+
+            if (initialTx) {
+              const lastTxHash = await this.lastTxHash.findOne({});
+              const firstPreBroadcastTxItem =
+                await this.preBroadcastTxItem.findOne({
+                  where: { preExecutionId: initialTx.id, action: 0 },
+                  order: { id: 'ASC' },
+                });
+
+              try {
+                await this.preBroadcastTxItem.save({
+                  ...firstPreBroadcastTxItem,
+                  data: lastTxHash.hash,
+                });
+              } catch (error) {
+                this.logger.error('update preBroadcastTxItem failed');
+                throw error;
+              }
+
+              const preBroadcastTxList = await this.preBroadcastTxItem.find({
+                where: { preExecutionId: initialTx.id },
+              });
+
+              if (preBroadcastTxList && preBroadcastTxList.length > 0) {
+                const content = this.routerService
+                  .from('0f0001')
+                  .encodeInscription(
+                    preBroadcastTxList?.map((_preBroadcastTxItem) => ({
+                      action: _preBroadcastTxItem?.action,
+                      data: _preBroadcastTxItem?.data,
+                    })),
+                  );
+
+                if (content) {
+                  await this.preBroadcastTx.update(
+                    { id: initialTx?.id },
+                    { content, previous: lastTxHash.hash },
+                  );
+                  const txData = await this.create(
+                    {
+                      content,
+                      receiverAddress: this.defaultConf.xvm.sysBtcAddress,
+                      feeRate,
+                    },
+                    initialTx?.id,
+                  );
+
+                  if (txData) {
+                    try {
+                      await this.preBroadcastTx.update(
+                        { id: initialTx?.id },
+                        { status: 2 },
+                      );
+                    } catch (error) {
+                      this.logger.error('update preBroadcastTx failed');
+                      throw error;
+                    }
+
+                    const bTCTransaction = new BTCTransaction(
+                      this.defaultConf.xvm.operatorPrivateKey,
+                    );
+                    const transferResult = await bTCTransaction.transfer(
+                      txData.address,
+                      txData.amount,
+                      feeRate,
+                    );
+                    if (transferResult && transferResult?.txid) {
+                      try {
+                        await this.preBroadcastTx.update(
+                          { id: initialTx?.id },
+                          { status: 3 },
+                        );
+                      } catch (error) {
+                        this.logger.error('update preBroadcastTx failed');
+                        throw error;
+                      }
+
+                      const txHash = await this.commit({
+                        id: initialTx?.id,
+                        tx: transferResult?.txid,
+                      });
+                    }
+                  }
+                }
+              }
             }
           }
         }
