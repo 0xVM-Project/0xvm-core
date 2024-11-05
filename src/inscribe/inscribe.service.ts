@@ -12,7 +12,7 @@ import { PreBroadcastTx } from 'src/entities/pre-broadcast-tx.entity';
 import { RouterService } from 'src/router/router.service';
 import { BTCTransaction } from 'src/utils/btc-transaction';
 import { createCommit, createReveal, relay } from 'src/utils/inscribe';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
   CommitRequest,
   CreateRequest,
@@ -108,10 +108,28 @@ export class InscribeService {
             hash: revealResult.txHash,
           },
         );
-        this.hashMappingRepository.update(
-          { xvmHash: preBroadcastTx.xvmBlockHash },
-          { btcHash: revealResult.txHash },
-        );
+        const preBroadcastTxList = await this.preBroadcastTxItem.find({
+          where: { id: request.id },
+        });
+
+        if (preBroadcastTxList && preBroadcastTxList?.length > 0) {
+          const xvmBlockHeightList = [];
+
+          preBroadcastTxList.forEach((_preBroadcastTxItem) => {
+            if (
+              !xvmBlockHeightList.includes(_preBroadcastTxItem?.xvmBlockHeight)
+            ) {
+              xvmBlockHeightList.push(_preBroadcastTxItem?.xvmBlockHeight);
+            }
+          });
+
+          if (xvmBlockHeightList && xvmBlockHeightList?.length > 0) {
+            await this.hashMappingRepository.update(
+              { btcHash: In(xvmBlockHeightList) },
+              { btcHash: revealResult.txHash },
+            );
+          }
+        }
       } catch (e) {
         throw new Error(
           'Commit inscribe param error, failed to relay tx: ' + e,

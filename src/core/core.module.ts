@@ -13,10 +13,11 @@ import { SqliteModule } from 'src/common/sqlite/sqlite.module';
 import { BtcHistoryTx } from 'src/entities/sqlite-entities/btc-history-tx.entity';
 import { PreExecutionModule } from 'src/pre-execution/pre-execution.module';
 import { LastTxHash } from 'src/entities/last-tx-hash.entity';
+import { PreBroadcastTxItem } from 'src/entities/pre-broadcast-tx-item.entity';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([BlockHashSnapshot,LastTxHash]),
+        TypeOrmModule.forFeature([BlockHashSnapshot,LastTxHash,PreBroadcastTxItem]),
         IndexerModule,
         RouterModule,
         XvmModule,

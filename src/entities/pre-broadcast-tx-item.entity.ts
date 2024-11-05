@@ -23,6 +23,17 @@ export class PreBroadcastTxItem {
   preExecutionId: number;
 
   @Column({
+    name: 'type',
+    type: 'tinyint',
+    nullable: false,
+    default: 1,
+    unsigned: true,
+    comment: '1: normal 2: pre',
+  })
+  @Index()
+  type: number;
+
+  @Column({
     name: 'action',
     type: 'tinyint',
     nullable: false,
@@ -42,6 +53,16 @@ export class PreBroadcastTxItem {
     collation: 'utf8mb4_general_ci',
   })
   data: string;
+
+  @Column({
+    name: 'xvm_block_height',
+    type: 'int',
+    nullable: false,
+    default: 0,
+    unsigned: true,
+  })
+  @Index()
+  xvmBlockHeight: number;
 
   @CreateDateColumn({ name: 'create_time', type: 'timestamp' })
   createTime?: Date;

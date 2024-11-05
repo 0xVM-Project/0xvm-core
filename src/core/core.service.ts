@@ -15,6 +15,8 @@ import { XvmService } from 'src/xvm/xvm.service';
 import { In, LessThan, LessThanOrEqual, MoreThanOrEqual, QueryFailedError, Repository, MoreThan } from 'typeorm';
 import { SequencerService } from './sequencer/sequencer.service';
 import { Inscription } from 'src/ord/inscription.service';
+import { CommandsV1Type } from 'src/router/interface/protocol.interface';
+import { PreBroadcastTxItem } from 'src/entities/pre-broadcast-tx-item.entity';
 
 @Injectable()
 export class CoreService {
@@ -30,6 +32,8 @@ export class CoreService {
         @Inject(defaultConfig.KEY) private readonly defaultConf: ConfigType<typeof defaultConfig>,
         @InjectRepository(BlockHashSnapshot) private readonly blockHashSnapshotRepository: Repository<BlockHashSnapshot>,
         @InjectRepository(LastTxHash) private readonly lastTxHash: Repository<LastTxHash>,
+        @InjectRepository(PreBroadcastTxItem)
+        private readonly preBroadcastTxItem: Repository<PreBroadcastTxItem>,
         private readonly indexerService: IndexerService,
         private readonly routerService: RouterService,
         private readonly xvmService: XvmService,
@@ -137,12 +141,28 @@ export class CoreService {
         const hashList: string[] = []
         let lastTransactionHash: string = ''
         for (let index = 0; index < inscriptionList.length; index++) {
-            const inscription = inscriptionList[index];
-            const _hashList = await this.routerService.from(inscription.content).executeTransaction(inscription)
-            hashList.push(..._hashList)
-            lastTransactionHash = inscription.hash
+            const inscription = inscriptionList[index]
+            const protocol = this.routerService.from(inscription.content)
+            const _hashList = await protocol.executeTransaction(inscription)
+
+            if(_hashList && _hashList?.length > 0){
+                hashList.push(..._hashList)
+                lastTransactionHash = inscription.hash
+                const decodeInscriptionList = protocol.decodeInscription(inscription.content) as CommandsV1Type[]
+
+                if(decodeInscriptionList && decodeInscriptionList?.length > 0){
+                    await this.preBroadcastTxItem.save(
+                        this.preBroadcastTxItem.create(
+                            decodeInscriptionList.map((_decodeInscriptionItem) => ({
+                                action: _decodeInscriptionItem.action,
+                                data: _decodeInscriptionItem.data,
+                                xvmBlockHeight: blockHeight
+                          })),
+                        ),
+                      );
+                }
+            }
         }
-        // preExecution update: save last transaction hash to database for preExecution
         try {
             if(lastTransactionHash){
                 await this.lastTxHash.update({},{ hash: lastTransactionHash})
@@ -276,8 +296,8 @@ export class CoreService {
 
     async run() {
         // 1. sync history tx
-        await this.sync()
-        // await this.execution()
+        // await this.sync()
+        await this.execution()
     }
 
     async execution() {

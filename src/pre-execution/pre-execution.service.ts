@@ -99,12 +99,11 @@ export class PreExecutionService {
 
         if (preBroadcastTxId) {
           const inscription = {
-            inscriptionId:
-              '0x0000000000000000000000000000000000000000000000000000000000000000',
+            inscriptionId: finalBlockHeightForXvm.toString().padStart(66, '0'),
             contentType: '',
             contentLength: 0,
             content,
-            hash: '0000000000000000000000000000000000000000000000000000000000000000',
+            hash: '0x0000000000000000000000000000000000000000000000000000000000000000',
           };
           const hashList = await protocol.executeTransaction(
             inscription,
@@ -119,6 +118,8 @@ export class PreExecutionService {
                     preExecutionId: preBroadcastTxId,
                     action: _tx.action,
                     data: _tx.data,
+                    type: 2,
+                    xvmBlockHeight: finalBlockHeightForXvm,
                   })),
                 ),
               );

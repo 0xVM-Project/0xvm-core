@@ -6,11 +6,6 @@ import * as ecc from 'tiny-secp256k1';
 
 export type BTCNetwork = 'mainnet' | 'testnet';
 
-interface txOutput {
-  address: string;
-  value: number;
-}
-
 interface Utxo {
   txid: string;
   vout: number;
@@ -37,6 +32,7 @@ export class BTCTransaction {
   private readonly p2tr: bitcoin.payments.Payment;
   private readonly internalPubkey: Buffer;
   private readonly bNetwork: bitcoin.networks.Network;
+  private readonly network: BTCNetwork;
 
   private readonly unisatBaseUrl = {
     testnet: 'https://wallet-api-testnet.unisat.io/v5',
@@ -44,6 +40,7 @@ export class BTCTransaction {
   };
 
   constructor(hexPrivateKey: string, network: BTCNetwork = 'testnet') {
+    this.network = network;
     this.bNetwork =
       network == 'mainnet'
         ? bitcoin.networks.bitcoin
@@ -107,8 +104,8 @@ export class BTCTransaction {
     return virtualSize * feeRate;
   }
 
-  async broadcastTransaction(txHex: string, network: BTCNetwork = 'testnet') {
-    const url = `https://mempool.space${network == 'testnet' ? '/testnet' : ''}/api/tx`;
+  async broadcastTransaction(txHex: string) {
+    const url = `https://mempool.space${this.network == 'testnet' ? '/testnet' : ''}/api/tx`;
     try {
       const response = await axios.post(url, txHex, {
         headers: { 'Content-Type': 'text/plain' },
@@ -242,14 +239,9 @@ export class BTCTransaction {
     }
   }
 
-  async transfer(
-    recipient: string,
-    value: number,
-    feeRate: number,
-    network: BTCNetwork = 'testnet',
-    utxos: Utxo[] = [],
-  ) {
-    const utxoResponse = await this.getUTXOs(this.p2tr.address!, network);
+  async transfer(recipient: string, value: number, feeRate: number) {
+    let utxos: Utxo[] = [];
+    const utxoResponse = await this.getUTXOs(this.p2tr.address!);
     if (!utxos || utxos.length == 0) {
       utxos = utxoResponse.data;
     }
@@ -268,7 +260,7 @@ export class BTCTransaction {
       `transfer ${sender} -> ${recipientAddress} ${transferAmount} fee:${fee}`,
     );
     let hash = '';
-    hash = await this.broadcastTransaction(txHex, network);
+    hash = await this.broadcastTransaction(txHex);
     const availableUTXO: Utxo = {
       txid: hash,
       vout: 1,
@@ -277,11 +269,8 @@ export class BTCTransaction {
     return availableUTXO;
   }
 
-  async getUTXOs(
-    address: string,
-    network: BTCNetwork = 'testnet',
-  ): Promise<UTXOResponse> {
-    const url = this.unisatBaseUrl[network] + '/address/btc-utxo';
+  async getUTXOs(address: string): Promise<UTXOResponse> {
+    const url = this.unisatBaseUrl[this.network] + '/address/btc-utxo';
     const response = await axios.get(url, { params: { address: address } });
     return response.data;
   }
