@@ -45,8 +45,6 @@ export class SequencerService {
             if (!protocolService.filterInscription(inscription)) {
                 continue
             }
-            // 9ecaec4178f8869dda136727618a658f8c87e9fcbb9c4ed986b156cba7ee2961
-            // 0x0000000000000000000000000000000000000000000000000000000000000000
             const { isPrecompute, mineTimestamp, prevHash } = protocolService.isPrecomputeInscription(inscription.content)
             actualSerialNumber += 1
             let newSort = Number(`${actualSerialNumber}0`)
