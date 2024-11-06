@@ -23,8 +23,20 @@ export class TaskService {
     }
   }
 
+  // @Timeout(5000)
   // @Interval(10000)
-  // async handleInterval() {
+  // async handleExecute() {
+  //   try {
+  //     this.logger.log('Execute service startup');
+  //     await this.coreService.execution();
+  //   } catch (error) {
+  //     this.logger.error(error instanceof Error ? error.stack : error);
+  //   }
+  // }
+
+  // @Timeout(10000)
+  // @Interval(10000)
+  // async handleInscribe() {
   //   try {
   //     this.logger.log('Inscribe service startup');
   //     await this.inscribeService.preCommit();

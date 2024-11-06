@@ -9,6 +9,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BlockHashSnapshot } from 'src/entities/block-snapshot.entity';
 import { BtcHistoryTx } from 'src/entities/sqlite-entities/btc-history-tx.entity';
 import { SqliteModule } from 'src/common/sqlite/sqlite.module';
+import { BtcrpcModule } from 'src/common/api/btcrpc/btcrpc.module';
 
 @Module({
     imports: [
@@ -19,6 +20,7 @@ import { SqliteModule } from 'src/common/sqlite/sqlite.module';
         XvmModule,
         OrdinalsModule,
         OrdModule,
+        BtcrpcModule
     ],
     providers: [
         ProtocolV001Service,

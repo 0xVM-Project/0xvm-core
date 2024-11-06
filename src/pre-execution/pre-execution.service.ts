@@ -7,11 +7,13 @@ import { InscriptionActionEnum } from 'src/indexer/indexer.enum';
 import { CommandsV1Type } from 'src/router/interface/protocol.interface';
 import { IProtocol } from 'src/router/router.interface';
 import { RouterService } from 'src/router/router.service';
+import { XvmService } from 'src/xvm/xvm.service';
 import { In, Repository } from 'typeorm';
 
 @Injectable()
 export class PreExecutionService {
   private readonly logger = new Logger(PreExecutionService.name);
+  private readonly maxInscriptionSize = 100;
 
   constructor(
     @InjectRepository(PendingTx)
@@ -21,71 +23,44 @@ export class PreExecutionService {
     @InjectRepository(PreBroadcastTx)
     private readonly preBroadcastTx: Repository<PreBroadcastTx>,
     private readonly routerService: RouterService,
+    private readonly xvmService: XvmService,
   ) {}
 
-  async execute(finalBlockHeightForXvm: number) {
-    const preTransactionList = await this.pendingTx.find({
-      where: { status: 1 },
-    });
+  async execute() {
+    const xvmLatestBlockNumber = await this.xvmService.getLatestBlockNumber();
 
-    if (preTransactionList && preTransactionList?.length > 0) {
-      let decodeInscriptionList: CommandsV1Type[] = [];
-      let availablePreTransactionList: PendingTx[] = [];
-      let decodeInscriptionString = '';
-      let protocol: IProtocol<any, any>;
-      let isInscriptionEnd = false;
+    if (!isNaN(xvmLatestBlockNumber)) {
+      const preTransactionList = await this.pendingTx.find({
+        where: { status: 1 },
+      });
 
-      for (const preTransaction of preTransactionList) {
-        const content = preTransaction?.content ?? '';
-
-        if (content) {
-          // todo: divide version
-          decodeInscriptionString += content;
-
-          if (decodeInscriptionString.length < 40000) {
-            protocol = this.routerService.from(content);
-            decodeInscriptionList.concat(protocol.decodeInscription(content));
-            availablePreTransactionList.push(preTransaction);
-          } else {
-            isInscriptionEnd = true;
-            break;
-          }
-        }
-      }
-
-      if (
-        decodeInscriptionList &&
-        decodeInscriptionList?.length > 0 &&
-        availablePreTransactionList &&
-        availablePreTransactionList?.length > 0
-      ) {
+      if (preTransactionList && preTransactionList?.length > 0) {
+        let decodeInscriptionList: CommandsV1Type[] = [];
+        let availablePreTransactionList: PendingTx[] = [];
+        let decodeInscriptionString = '';
+        let protocol: IProtocol<any, any>;
+        let isInscriptionEnd = false;
         let preBroadcastTxId = 0;
-        const txList = [
-          {
-            action: InscriptionActionEnum.prev,
-            data: '0x0000000000000000000000000000000000000000000000000000000000000000',
-          },
-        ]
-          .concat(decodeInscriptionList)
-          .concat([
-            {
-              action: InscriptionActionEnum.mineBlock,
-              data: `0x${finalBlockHeightForXvm.toString(16).padStart(10, '0')}${Math.floor(Date.now() / 1000).toString(16)}`,
-            },
-          ]);
-
-        const content = protocol.encodeInscription(txList);
 
         try {
           const packagePreBroadcastTx = await this.preBroadcastTx.findOne({
-            where: { status: 1 },
+            where: { status: 0 },
           });
 
           if (packagePreBroadcastTx) {
             preBroadcastTxId = packagePreBroadcastTx?.id;
+            const preBroadcastTxItemList = await this.preBroadcastTxItem.find({
+              where: { preExecutionId: preBroadcastTxId },
+            });
+
+            if (preBroadcastTxItemList && preBroadcastTxItemList?.length > 0) {
+              decodeInscriptionString = protocol.encodeInscription(
+                preBroadcastTxItemList,
+              );
+            }
           } else {
             const preBroadcastTx = await this.preBroadcastTx.save(
-              this.preBroadcastTx.create({}),
+              this.preBroadcastTx.create({ content: '', commitTx: '' }),
             );
 
             if (preBroadcastTx && preBroadcastTx?.id) {
@@ -98,56 +73,108 @@ export class PreExecutionService {
         }
 
         if (preBroadcastTxId) {
-          const inscription = {
-            inscriptionId: finalBlockHeightForXvm.toString().padStart(66, '0'),
-            contentType: '',
-            contentLength: 0,
-            content,
-            hash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-          };
-          const hashList = await protocol.executeTransaction(
-            inscription,
-            isInscriptionEnd,
-          );
+          for (const preTransaction of preTransactionList) {
+            const content = preTransaction?.content ?? '';
 
-          if (hashList && hashList?.length > 0) {
-            try {
-              const result = await this.preBroadcastTxItem.save(
-                this.preBroadcastTxItem.create(
-                  txList.map((_tx) => ({
-                    preExecutionId: preBroadcastTxId,
-                    action: _tx.action,
-                    data: _tx.data,
-                    type: 2,
-                    xvmBlockHeight: finalBlockHeightForXvm,
-                  })),
-                ),
+            if (
+              content &&
+              decodeInscriptionString.length < this.maxInscriptionSize
+            ) {
+              // over one preTransaction
+              decodeInscriptionString += content;
+              protocol = this.routerService.from(content);
+              decodeInscriptionList = decodeInscriptionList.concat(
+                protocol.decodeInscription(content),
+              );
+              availablePreTransactionList.push(preTransaction);
+
+              if (decodeInscriptionString.length >= this.maxInscriptionSize) {
+                isInscriptionEnd = true;
+                break;
+              }
+            }
+          }
+
+          if (
+            decodeInscriptionString &&
+            decodeInscriptionList &&
+            decodeInscriptionList?.length > 0 &&
+            availablePreTransactionList &&
+            availablePreTransactionList?.length > 0
+          ) {
+            const txList = [
+              {
+                action: InscriptionActionEnum.prev,
+                data: '0x0000000000000000000000000000000000000000000000000000000000000000',
+              },
+            ]
+              .concat(decodeInscriptionList)
+              .concat([
+                {
+                  action: InscriptionActionEnum.mineBlock,
+                  data: `0x${xvmLatestBlockNumber.toString(16).padStart(10, '0')}${Math.floor(Date.now() / 1000).toString(16)}`,
+                },
+              ]);
+            const content = protocol.encodeInscription(txList);
+
+            if (content) {
+              const inscription = {
+                inscriptionId: xvmLatestBlockNumber
+                  .toString()
+                  .padStart(66, '0'),
+                contentType: '',
+                contentLength: 0,
+                content,
+                hash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+              };
+              const hashList = await protocol.executeTransaction(
+                inscription,
+                isInscriptionEnd,
               );
 
-              if (result && result?.length > 0) {
-                if (isInscriptionEnd) {
-                  await this.preBroadcastTx.update(
-                    { id: preBroadcastTxId },
-                    { status: 1, xvmBlockHash: hashList[hashList.length - 1] },
-                  );
-                }
-
-                await this.pendingTx.update(
-                  {
-                    id: In(
-                      availablePreTransactionList?.map(
-                        (_preTransactionItem) => _preTransactionItem?.id,
-                      ),
+              if (hashList && hashList?.length > 0) {
+                try {
+                  const result = await this.preBroadcastTxItem.save(
+                    this.preBroadcastTxItem.create(
+                      txList.map((_tx) => ({
+                        preExecutionId: preBroadcastTxId,
+                        action: _tx.action,
+                        data: _tx.data ?? '',
+                        type: 2,
+                        xvmBlockHeight: xvmLatestBlockNumber,
+                      })),
                     ),
-                  },
-                  {
-                    status: 2,
-                  },
-                );
+                  );
+
+                  if (result && result?.length > 0) {
+                    if (isInscriptionEnd) {
+                      await this.preBroadcastTx.update(
+                        { id: preBroadcastTxId },
+                        {
+                          status: 1,
+                          xvmBlockHash: hashList[hashList.length - 1],
+                        },
+                      );
+                    }
+
+                    await this.pendingTx.update(
+                      {
+                        id: In(
+                          availablePreTransactionList?.map(
+                            (_preTransactionItem) => _preTransactionItem?.id,
+                          ),
+                        ),
+                      },
+                      {
+                        status: 2,
+                      },
+                    );
+                  }
+                } catch (error) {
+                  this.logger.error('add preBroadcastTxItem failed');
+                  throw error;
+                }
               }
-            } catch (error) {
-              this.logger.error('add preBroadcastTxItem failed');
-              throw error;
             }
           }
         }

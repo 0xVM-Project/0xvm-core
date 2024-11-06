@@ -109,7 +109,11 @@ export class XvmService {
             }
             this.logger.warn(errorMessage)
         }
-        this.userNonce[unSignTransaction.from]++
+        if(!this.userNonce[unSignTransaction.from]){
+            this.userNonce[unSignTransaction.from]=parseInt(String(unSignTransaction.nonce), 16)+1
+        }else{
+            this.userNonce[unSignTransaction.from]++
+        }
         return data.result
     }
 

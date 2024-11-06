@@ -40,8 +40,4 @@ describe('CoreService', () => {
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
-
-  it('process block', async () => {
-    await service.processBlock(2966333)
-  })
 });

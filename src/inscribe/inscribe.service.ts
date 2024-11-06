@@ -6,7 +6,7 @@ import { Transaction } from 'bitcoinjs-lib';
 import { firstValueFrom } from 'rxjs';
 import defaultConfig from 'src/config/default.config';
 import { HashMapping } from 'src/entities/hash-mapping.entity';
-import { LastTxHash } from 'src/entities/last-tx-hash.entity';
+import { LastConfig } from 'src/entities/last-config.entity';
 import { PreBroadcastTxItem } from 'src/entities/pre-broadcast-tx-item.entity';
 import { PreBroadcastTx } from 'src/entities/pre-broadcast-tx.entity';
 import { RouterService } from 'src/router/router.service';
@@ -28,8 +28,8 @@ export class InscribeService {
   constructor(
     @InjectRepository(PreBroadcastTx)
     private readonly preBroadcastTx: Repository<PreBroadcastTx>,
-    @InjectRepository(LastTxHash)
-    private readonly lastTxHash: Repository<LastTxHash>,
+    @InjectRepository(LastConfig)
+    private readonly lastConfig: Repository<LastConfig>,
     @InjectRepository(HashMapping)
     private readonly hashMappingRepository: Repository<HashMapping>,
     @InjectRepository(PreBroadcastTxItem)
@@ -102,10 +102,10 @@ export class InscribeService {
             status: 4,
           },
         );
-        this.lastTxHash.update(
+        this.lastConfig.update(
           {},
           {
-            hash: revealResult.txHash,
+            lastTxHash: revealResult.txHash,
           },
         );
         const preBroadcastTxList = await this.preBroadcastTxItem.find({
@@ -119,7 +119,11 @@ export class InscribeService {
             if (
               !xvmBlockHeightList.includes(_preBroadcastTxItem?.xvmBlockHeight)
             ) {
-              xvmBlockHeightList.push(_preBroadcastTxItem?.xvmBlockHeight);
+              xvmBlockHeightList.push(
+                `0x${_preBroadcastTxItem?.xvmBlockHeight
+                  ?.toString()
+                  .padStart(64, '0')}`,
+              );
             }
           });
 
@@ -164,7 +168,7 @@ export class InscribeService {
         (_item) => _item?.title === 'Avg',
       )?.feeRate;
 
-      if (feeRate && feeRate > 0 && feeRate <= 500) {
+      if (feeRate && feeRate > 0 && feeRate <= 10) {
         const pendingTx = await this.preBroadcastTx.findOne({
           where: {
             status: 3,
@@ -225,7 +229,7 @@ export class InscribeService {
             });
 
             if (initialTx) {
-              const lastTxHash = await this.lastTxHash.findOne({});
+              const lastConfig = await this.lastConfig.findOne({});
               const firstPreBroadcastTxItem =
                 await this.preBroadcastTxItem.findOne({
                   where: { preExecutionId: initialTx.id, action: 0 },
@@ -235,7 +239,7 @@ export class InscribeService {
               try {
                 await this.preBroadcastTxItem.save({
                   ...firstPreBroadcastTxItem,
-                  data: lastTxHash.hash,
+                  data: lastConfig.lastTxHash ?? '',
                 });
               } catch (error) {
                 this.logger.error('update preBroadcastTxItem failed');
@@ -259,7 +263,7 @@ export class InscribeService {
                 if (content) {
                   await this.preBroadcastTx.update(
                     { id: initialTx?.id },
-                    { content, previous: lastTxHash.hash },
+                    { content, previous: lastConfig.lastTxHash },
                   );
                   const txData = await this.create(
                     {

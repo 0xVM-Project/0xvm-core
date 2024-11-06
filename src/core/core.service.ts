@@ -5,7 +5,6 @@ import { BtcrpcService } from 'src/common/api/btcrpc/btcrpc.service';
 import defaultConfig from 'src/config/default.config';
 import { BlockHashSnapshot } from 'src/entities/block-snapshot.entity';
 import { BtcHistoryTx } from 'src/entities/sqlite-entities/btc-history-tx.entity';
-import { LastTxHash } from 'src/entities/last-tx-hash.entity';
 import { IndexerService } from 'src/indexer/indexer.service';
 import { PreExecutionService } from 'src/pre-execution/pre-execution.service';
 import { RouterService } from 'src/router/router.service';
@@ -17,6 +16,7 @@ import { SequencerService } from './sequencer/sequencer.service';
 import { Inscription } from 'src/ord/inscription.service';
 import { CommandsV1Type } from 'src/router/interface/protocol.interface';
 import { PreBroadcastTxItem } from 'src/entities/pre-broadcast-tx-item.entity';
+import { LastConfig } from 'src/entities/last-config.entity';
 
 @Injectable()
 export class CoreService {
@@ -27,11 +27,12 @@ export class CoreService {
     private latestBlockHeightForXvm: number
     private diffBlock: number
     private syncStatus: boolean
+    private isExecutionRunning:boolean;
 
     constructor(
         @Inject(defaultConfig.KEY) private readonly defaultConf: ConfigType<typeof defaultConfig>,
         @InjectRepository(BlockHashSnapshot) private readonly blockHashSnapshotRepository: Repository<BlockHashSnapshot>,
-        @InjectRepository(LastTxHash) private readonly lastTxHash: Repository<LastTxHash>,
+        @InjectRepository(LastConfig) private readonly lastConfig: Repository<LastConfig>,
         @InjectRepository(PreBroadcastTxItem)
         private readonly preBroadcastTxItem: Repository<PreBroadcastTxItem>,
         private readonly indexerService: IndexerService,
@@ -47,132 +48,7 @@ export class CoreService {
             .then(latestBlockHeight => this.latestBlockHeightForBtc = latestBlockHeight)
             .catch(error => { throw error })
         this.syncStatus = false
-    }
-
-    async snapshotBlock(blockHeight: number, blockHash?: string) {
-        try {
-            if (!blockHash) {
-                const { result } = await this.btcrpcService.getblockhash(blockHeight)
-                blockHash = result
-            }
-            const saveData = this.blockHashSnapshotRepository.create({ blockHash: blockHash, blockHeight: blockHeight })
-            await this.blockHashSnapshotRepository.save(saveData)
-
-            // Only keep the last confirmBlockHeight blocks
-            await this.blockHashSnapshotRepository.delete({
-                blockHeight: LessThanOrEqual(blockHeight - this.defaultConf.bitcoind.confirmBlockHeight)
-            })
-        } catch (error) {
-            if (error instanceof QueryFailedError && error.driverError?.errno == 1062) {
-                this.logger.warn(`snapshot block ${blockHeight} already exists`)
-                return
-            }
-            throw error
-        }
-    }
-
-    async getFinalBlock(verifyBlockHeight: number): Promise<number> {
-        const confirmBlockHeight = this.defaultConf.bitcoind.confirmBlockHeight
-        let snapshotBlockHeights = []
-        for (let index = 0; index < confirmBlockHeight; index++) {
-            snapshotBlockHeights.push(verifyBlockHeight - index)
-        }
-        const result = await this.blockHashSnapshotRepository.find({
-            where: {
-                blockHeight: In(snapshotBlockHeights)
-            },
-            order: {
-                blockHeight: 'DESC'
-            },
-            take: confirmBlockHeight
-        })
-        // No snapshot information is returned for the current block height
-        if (result.length == 0) {
-            return verifyBlockHeight
-        }
-        const rangeBlockHeight = result.map(d => d.blockHeight).reverse()
-        // check block height range sequence
-        const blockHeightSequentialStatus = isSequential(rangeBlockHeight)
-        if (!blockHeightSequentialStatus) {
-            throw new Error(`Snapshot data is abnormal, and there is missing block information. Block Height range: ${JSON.stringify(rangeBlockHeight ?? [])}`)
-        }
-        // Compare the snapshot data with the latest block data and return the block height that needs to be rolled back
-        let finalBlockHeight = result[0].blockHeight
-        let retryCount = 0
-        for (let index = 0; index < result.length;) {
-            const snapshot = result[index]
-            const { result: blockHashByNetwork } = await this.btcrpcService.getblockhash(snapshot.blockHeight)
-            if (blockHashByNetwork != snapshot.blockHash) {
-                if (!blockHashByNetwork) {
-                    retryCount++
-                    this.logger.warn(`get block hash fail, hash: ${blockHashByNetwork}, retry ${retryCount}`)
-                    await sleep(1000 * retryCount)
-                    continue
-                }
-                retryCount = 0
-                finalBlockHeight = snapshot.blockHeight - 1
-            }
-            index++
-        }
-        if (finalBlockHeight != verifyBlockHeight) {
-            // todo: revertBlock
-            const state = await this.xvmService.revertBlock(finalBlockHeight)
-            if (state != true) {
-                throw new Error(`Revert Block [${finalBlockHeight}] fail. `)
-            } else {
-                this.logger.log(`Revert Block [${finalBlockHeight}] success. `)
-            }
-            await this.blockHashSnapshotRepository.delete({
-                blockHeight: MoreThan(finalBlockHeight)
-            })
-            return finalBlockHeight
-        }
-        return finalBlockHeight
-    }
-
-    async processBlock(blockHeight: number): Promise<string> {
-        this.xvmService.initNonce()
-        const { inscriptionList, allInscriptionCount, blockHash, blockTimestamp } = await this.indexerService.fetchInscription0xvmByBlock(blockHeight)
-        const remainingBlock = this.latestBlockHeightForBtc - (blockHeight - 1)
-        const progressRate = Math.floor((blockHeight - 1) / this.latestBlockHeightForBtc * 10000) / 100
-        this.logger.log(`⟱⟱⟱ ${blockHeight} ⟱⟱⟱`)
-        const message = `Block [${blockHeight}/${this.latestBlockHeightForBtc}] Total:${allInscriptionCount} 0xvm:${inscriptionList.length} RemainingBlock:${remainingBlock} Progress:${progressRate}%`
-        this.logger.log(message)
-        const hashList: string[] = []
-        let lastTransactionHash: string = ''
-        for (let index = 0; index < inscriptionList.length; index++) {
-            const inscription = inscriptionList[index]
-            const protocol = this.routerService.from(inscription.content)
-            const _hashList = await protocol.executeTransaction(inscription)
-
-            if(_hashList && _hashList?.length > 0){
-                hashList.push(..._hashList)
-                lastTransactionHash = inscription.hash
-                const decodeInscriptionList = protocol.decodeInscription(inscription.content) as CommandsV1Type[]
-
-                if(decodeInscriptionList && decodeInscriptionList?.length > 0){
-                    await this.preBroadcastTxItem.save(
-                        this.preBroadcastTxItem.create(
-                            decodeInscriptionList.map((_decodeInscriptionItem) => ({
-                                action: _decodeInscriptionItem.action,
-                                data: _decodeInscriptionItem.data,
-                                xvmBlockHeight: blockHeight
-                          })),
-                        ),
-                      );
-                }
-            }
-        }
-        try {
-            if(lastTransactionHash){
-                await this.lastTxHash.update({},{ hash: lastTransactionHash})
-            }
-        } catch (error) {
-            this.logger.error("add lastTxHsh failed")
-            throw error
-        }
-        this.logger.log(`[${blockHeight}] xvmInscription:${inscriptionList.length}  xvmTransaction:${hashList.length}`)
-        return blockHash
+        this.isExecutionRunning = false
     }
 
     get isSyncSuccess(): boolean {
@@ -296,72 +172,115 @@ export class CoreService {
 
     async run() {
         // 1. sync history tx
-        // await this.sync()
-        await this.execution()
+        await this.sync()
     }
 
     async execution() {
-        this.logger.log("Run start")
-        let retryTotal = 0
+        const isSyncSuccess = this.isSyncSuccess;
 
-        if (this.latestBlockHeightForBtc && this.latestBlockHeightForXvm && this.latestBlockHeightForBtc > 0 && this.latestBlockHeightForXvm > 0) {
-            let latestBlockHeightForXvm = this.latestBlockHeightForBtc
+        if(!this.isExecutionRunning && isSyncSuccess){
+            this.isExecutionRunning = true;
+            const lastConfig = await this.lastConfig.findOne({});
+            const lastBtcBlockHeight = lastConfig?.lastBtcBlockHeight??0;
+            const btcLatestBlockNumber = await this.indexerService.getLatestBlockNumberForBtc();
 
-            while (true) {
-                try {
-                    if (retryTotal > this.retryCount) {
-                        this.logger.warn(`Run retry failed several times, please manually process`)
-                        break
-                    }
+            if(btcLatestBlockNumber){
+                const lastConfig = await this.lastConfig.findOne({});
+    
+                if(!lastConfig){
+                    await this.lastConfig.save(this.lastConfig.create());
+                }
 
-                    if(this.latestBlockHeightForBtc === latestBlockHeightForXvm + 1){
-                        const lastTxHash = await this.lastTxHash.findOne({});
+                if(btcLatestBlockNumber > lastBtcBlockHeight){
+                    let retryTotal = 0
 
-                        if(!lastTxHash){
-                            await this.lastTxHash.save(this.lastTxHash.create())
+                    while (true) {
+                        try {
+                            if (retryTotal > 6) {
+                                this.logger.warn(`normalExecution run retry failed several times, please manually process`)
+                                this.isExecutionRunning = false;
+                                break
+                            }else{
+                                await this.normalExecution(btcLatestBlockNumber+1);
+                                this.isExecutionRunning = false;
+                                break
+                            }
+                        } catch (error) {
+                            retryTotal += 1
+                            this.logger.error(error instanceof Error ? error.stack : error)
+                            this.logger.log(`normalExecution run try retrying ${retryTotal}`)
+                            await sleep(2000 + 2000 * retryTotal)
                         }
-
-                        const finalBlockHeightForXvm = await this.normalExecution()
-
-                        if(finalBlockHeightForXvm){
-                            await this.preExecution(finalBlockHeightForXvm+1)
-                        }
-
-                        retryTotal = 0
-                    } else if (this.latestBlockHeightForBtc === latestBlockHeightForXvm) {
-                        this.logger.log(`[${this.latestBlockHeightForXvm}/${this.latestBlockHeightForBtc}] Waiting for new blocks`)
-                        await sleep(10000)
-                        continue
-                    } else {
-                        break
                     }
-                } catch (error) {
-                    retryTotal += 1
-                    this.logger.error(error instanceof Error ? error.stack : error)
-                    this.logger.log(`Run try retrying ${retryTotal}`)
-                    await sleep(2000 + 2000 * retryTotal)
+                }else{
+                    let retryTotal = 0
+
+                    while (true) {
+                        try {
+                            if (retryTotal > 6) {
+                                this.logger.warn(`preExecution run retry failed several times, please manually process`)
+                                this.isExecutionRunning = false;
+                                break
+                            }else{
+                                await this.preExecution();
+                                this.isExecutionRunning = false;
+                                break
+                            }
+                        } catch (error) {
+                            retryTotal += 1
+                            this.logger.error(error instanceof Error ? error.stack : error)
+                            this.logger.log(`preExecution run try retrying ${retryTotal}`)
+                            await sleep(2000 + 2000 * retryTotal)
+                        }
+                    }
                 }
             }
-        } else {
-            this.logger.log("Run Invalid latestBlockHeightForXvm, skip");
         }
     }
 
-    async normalExecution() {
-        const finalBlockHeightForXvm = await this.getFinalBlock(
-            this.latestBlockHeightForXvm,
-        );
-        const processBlockHeightForXvm = finalBlockHeightForXvm + 1;
-        const processBlockHashForXvm = await this.processBlock(
-            processBlockHeightForXvm,
-        );
-        await this.snapshotBlock(processBlockHeightForXvm, processBlockHashForXvm);
-        return processBlockHeightForXvm;
-      }
+    async normalExecution(btcLatestBlockNumber:number) {
+        this.xvmService.initNonce()
+        const { inscriptionList } = await this.indexerService.fetchInscription0xvmByBlock(btcLatestBlockNumber);
+        const hashList: string[] = [];
+        let lastTxHash: string = '';
+
+        if(inscriptionList && inscriptionList?.length > 0){
+            for (let index = 0; index < inscriptionList.length; index++) {
+                const inscription = inscriptionList[index]
+                const protocol = this.routerService.from(inscription.content)
+                const _hashList = await protocol.executeTransaction(inscription)
     
-      async preExecution(finalBlockHeightForXvm:number) {
-        if(finalBlockHeightForXvm){
-            this.preExecutionService.execute(finalBlockHeightForXvm); 
+                if(_hashList && _hashList?.length > 0){
+                    hashList.push(..._hashList)
+                    lastTxHash = inscription.hash
+                    const decodeInscriptionList = protocol.decodeInscription(inscription.content) as CommandsV1Type[]
+    
+                    if(decodeInscriptionList && decodeInscriptionList?.length > 0){
+                        await this.preBroadcastTxItem.save(
+                            this.preBroadcastTxItem.create(
+                                decodeInscriptionList.map((_decodeInscriptionItem) => ({
+                                    action: _decodeInscriptionItem.action,
+                                    data: _decodeInscriptionItem.data??"",
+                                    xvmBlockHeight: btcLatestBlockNumber
+                              })),
+                            ),
+                          );
+                    }
+                }
+            }
+
+            try {
+                if(lastTxHash){
+                    await this.lastConfig.update({},{ lastTxHash: lastTxHash})
+                }
+            } catch (error) {
+                this.logger.error("add lastTxHsh failed")
+                throw error
+            }
         }
-      }
+    }
+    
+    async preExecution() {
+        await this.preExecutionService.execute(); 
+    }
 }
