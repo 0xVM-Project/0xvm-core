@@ -26,8 +26,8 @@ export class CoreService {
     private latestBlockHeightForBtc: number
     private latestBlockHeightForXvm: number
     private diffBlock: number
-    private syncStatus: boolean
     private isExecutionRunning:boolean;
+    private syncStatus: { isSuccess: boolean, latestBtcBlockHeight: number }
 
     constructor(
         @Inject(defaultConfig.KEY) private readonly defaultConf: ConfigType<typeof defaultConfig>,
@@ -47,11 +47,14 @@ export class CoreService {
         this.indexerService.getLatestBlockNumberForBtc()
             .then(latestBlockHeight => this.latestBlockHeightForBtc = latestBlockHeight)
             .catch(error => { throw error })
-        this.syncStatus = false
+        this.syncStatus = {
+            isSuccess: false,
+            latestBtcBlockHeight: this.firstInscriptionBlockHeight
+        }
         this.isExecutionRunning = false
     }
 
-    get isSyncSuccess(): boolean {
+    get getSyncStatus(): { isSuccess: boolean, latestBtcBlockHeight: number } {
         return this.syncStatus
     }
 
@@ -97,7 +100,7 @@ export class CoreService {
             }
             // let savedRow = 0
             const savedRow = await this.sequencerService.syncSequencer(processBlockHeight)
-            if (latestBlockHeightForBtc - processBlockHeight <= 1) {
+            if (latestBlockHeightForBtc - processBlockHeight == 1) {
                 latestBlockHeightForBtc = await this.indexerService.getLatestBlockNumberForBtc()
             }
             schedule.processBlockHeight = processBlockHeight
@@ -107,15 +110,15 @@ export class CoreService {
             this.logger.log(`Sync saved ${processBlockHeight}/${latestBlockHeightForBtc} Inscription-Nums: ${savedRow} Time-left ${timeleft}`)
             processBlockHeight += 1
         }
+        this.syncStatus.latestBtcBlockHeight = latestBlockHeightForBtc
 
         // Execution of synchronised transactions
         let nextSort = 0
         let history: BtcHistoryTx[] = []
         const { result: latestBlockBy0xvm } = await this.xvmService.getLatestBlock()
         const latestBlockTimestampBy0xvm = parseInt(latestBlockBy0xvm.timestamp.slice(2), 16)
-        const latestBlockHeightBy0xvm = parseInt(latestBlockBy0xvm.number.slice(2), 16)
         // Synchronous execution start time
-        const syncExecutionStartTime = latestBlockHeightBy0xvm == 0 ? 0 : latestBlockTimestampBy0xvm
+        const syncExecutionStartTime = latestBlockTimestampBy0xvm
         while (true) {
             this.xvmService.initNonce()
             history = await this.btcHistoryTxRepository.find({
@@ -167,7 +170,7 @@ export class CoreService {
                 )
             }
         }
-        this.syncStatus = true
+        this.syncStatus.isSuccess = true
     }
 
     async run() {
@@ -176,12 +179,12 @@ export class CoreService {
     }
 
     async execution() {
-        const isSyncSuccess = this.isSyncSuccess;
+        const syncStatus = this.getSyncStatus;
 
-        if(!this.isExecutionRunning && isSyncSuccess){
+        if(!this.isExecutionRunning && syncStatus.isSuccess){
             this.isExecutionRunning = true;
             const lastConfig = await this.lastConfig.findOne({});
-            const lastBtcBlockHeight = lastConfig?.lastBtcBlockHeight??0;
+            const lastBtcBlockHeight = lastConfig?.lastBtcBlockHeight??syncStatus.latestBtcBlockHeight;
             const btcLatestBlockNumber = await this.indexerService.getLatestBlockNumberForBtc();
 
             if(btcLatestBlockNumber){

@@ -22,6 +22,11 @@ export class IndexerService {
         return blocks
     }
 
+    async getLatestBlockInfoForBtc(): Promise<{ block: number, timestamp: number }> {
+        const { result: { blocks, time } } = await this.btcrpcService.getBlockchainInfoForBtc()
+        return { block: blocks, timestamp: time }
+    }
+
     async fetchInscription0xvmByBlock(blockHeight: string | number): Promise<{ inscriptionList: Inscription[], nextBlockHash: string, blockHash: string, allInscriptionCount: number, blockTimestamp: number }> {
         if (Number.isNaN(blockHeight)) {
             throw new Error(`blockHeight cannot be nan`)
