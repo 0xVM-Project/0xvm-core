@@ -22,7 +22,6 @@ export class TaskService {
     }
   }
 
-  @Timeout(5000)
   @Interval(5000)
   async handleExecute() {
     try {
@@ -33,7 +32,6 @@ export class TaskService {
     }
   }
 
-  @Timeout(10000)
   @Interval(10000)
   async handleInscribe() {
     try {

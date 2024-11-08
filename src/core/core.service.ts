@@ -182,6 +182,7 @@ export class CoreService {
     }
 
     async execution() {
+        this.logger.debug("execution")
         const syncStatus = this.getSyncStatus;
 
         if(!this.isExecutionRunning && syncStatus.isSuccess){
@@ -265,6 +266,7 @@ export class CoreService {
     }
 
     async normalExecution(btcLatestBlockNumber:number) {
+        this.logger.debug("normalExecution")
         this.xvmService.initNonce()
         const { inscriptionList } = await this.indexerService.fetchNormalInscription0xvmByBlock(btcLatestBlockNumber);
         const hashList: string[] = [];
@@ -307,6 +309,8 @@ export class CoreService {
     }
     
     async preExecution(onlyReward?:boolean) {
+        this.logger.debug("preExecution")
+        this.xvmService.initNonce()
         if(onlyReward){
             await this.preExecutionService.reward(); 
         }else{
