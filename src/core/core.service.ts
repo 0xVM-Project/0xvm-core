@@ -17,6 +17,7 @@ import { Inscription } from 'src/ord/inscription.service';
 import { CommandsV1Type } from 'src/router/interface/protocol.interface';
 import { PreBroadcastTxItem } from 'src/entities/pre-broadcast-tx-item.entity';
 import { LastConfig } from 'src/entities/last-config.entity';
+import { PreBroadcastTx } from 'src/entities/pre-broadcast-tx.entity';
 
 @Injectable()
 export class CoreService {
@@ -42,6 +43,8 @@ export class CoreService {
         private readonly preExecutionService: PreExecutionService,
         @InjectRepository(BtcHistoryTx, 'sqlite') private btcHistoryTxRepository: Repository<BtcHistoryTx>,
         private readonly sequencerService: SequencerService,
+        @InjectRepository(PreBroadcastTx)
+        private readonly preBroadcastTx: Repository<PreBroadcastTx>,
     ) {
         this.firstInscriptionBlockHeight = this.defaultConf.xvm.firstInscriptionBlockHeight
         this.indexerService.getLatestBlockNumberForBtc()
@@ -183,17 +186,27 @@ export class CoreService {
 
         if(!this.isExecutionRunning && syncStatus.isSuccess){
             this.isExecutionRunning = true;
-            const lastConfig = await this.lastConfig.findOne({});
-            const lastBtcBlockHeight = lastConfig?.lastBtcBlockHeight??syncStatus.latestBtcBlockHeight;
+            let lastBtcBlockHeight = syncStatus.latestBtcBlockHeight;
+            const lastConfig = await this.lastConfig.find({
+                take: 1,
+                order: {
+                  id: 'ASC',
+                },
+            });
+
+            if(lastConfig && lastConfig?.length > 0){
+                const _lastBtcBlockHeight = lastConfig?.[0]?.lastBtcBlockHeight;
+
+                if(_lastBtcBlockHeight){
+                    lastBtcBlockHeight = _lastBtcBlockHeight;
+                }
+            }else{
+                await this.lastConfig.save(this.lastConfig.create());
+            }
+             
             const btcLatestBlockNumber = await this.indexerService.getLatestBlockNumberForBtc();
 
             if(btcLatestBlockNumber){
-                const lastConfig = await this.lastConfig.findOne({});
-    
-                if(!lastConfig){
-                    await this.lastConfig.save(this.lastConfig.create());
-                }
-
                 if(btcLatestBlockNumber > lastBtcBlockHeight){
                     let retryTotal = 0
 
@@ -204,7 +217,17 @@ export class CoreService {
                                 this.isExecutionRunning = false;
                                 break
                             }else{
-                                await this.normalExecution(btcLatestBlockNumber+1);
+                                const unPackagedTx = await this.preBroadcastTx.exists({where:{status:0}})
+
+                                if(unPackagedTx){
+                                    await this.preExecution(true);
+                                    await this.normalExecution(btcLatestBlockNumber+1);
+                                }else{
+                                    await this.normalExecution(btcLatestBlockNumber+1);
+                                    await this.preExecution();
+                                }
+
+                                await this.lastConfig.update({},{lastBtcBlockHeight:btcLatestBlockNumber+1})
                                 this.isExecutionRunning = false;
                                 break
                             }
@@ -243,7 +266,7 @@ export class CoreService {
 
     async normalExecution(btcLatestBlockNumber:number) {
         this.xvmService.initNonce()
-        const { inscriptionList } = await this.indexerService.fetchInscription0xvmByBlock(btcLatestBlockNumber);
+        const { inscriptionList } = await this.indexerService.fetchNormalInscription0xvmByBlock(btcLatestBlockNumber);
         const hashList: string[] = [];
         let lastTxHash: string = '';
 
@@ -274,7 +297,7 @@ export class CoreService {
 
             try {
                 if(lastTxHash){
-                    await this.lastConfig.update({},{ lastTxHash: lastTxHash})
+                    await this.lastConfig.update({},{lastTxHash})
                 }
             } catch (error) {
                 this.logger.error("add lastTxHsh failed")
@@ -283,7 +306,11 @@ export class CoreService {
         }
     }
     
-    async preExecution() {
-        await this.preExecutionService.execute(); 
+    async preExecution(onlyReward?:boolean) {
+        if(onlyReward){
+            await this.preExecutionService.reward(); 
+        }else{
+            await this.preExecutionService.execute(); 
+        }
     }
 }

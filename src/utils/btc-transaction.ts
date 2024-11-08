@@ -45,6 +45,7 @@ export class BTCTransaction {
       network == 'mainnet'
         ? bitcoin.networks.bitcoin
         : bitcoin.networks.testnet;
+    bitcoin.initEccLib(ecc);
     this.ECPair = ECPairFactory(ecc);
     const privateKeyBuffer = Buffer.from(hexPrivateKey, 'hex');
     this.keyPair = this.ECPair.fromPrivateKey(privateKeyBuffer, {
@@ -257,16 +258,16 @@ export class BTCTransaction {
       availableBalance,
     } = await this.generateTransferHex(recipient, value, feeRate, utxos);
     console.log(
-      `transfer ${sender} -> ${recipientAddress} ${transferAmount} fee:${fee}`,
+      `transfer ${sender} -> ${recipientAddress} ${transferAmount} fee:${fee} availableBalance:${availableBalance}`,
     );
-    let hash = '';
-    hash = await this.broadcastTransaction(txHex);
-    const availableUTXO: Utxo = {
-      txid: hash,
-      vout: 1,
-      satoshis: availableBalance,
-    };
-    return availableUTXO;
+    // let hash = '';
+    // hash = await this.broadcastTransaction(txHex);
+    // const availableUTXO: Utxo = {
+    //   txid: txHex,
+    //   vout: 1,
+    //   satoshis: availableBalance,
+    // };
+    return txHex;
   }
 
   async getUTXOs(address: string): Promise<UTXOResponse> {

@@ -40,7 +40,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         return this.flatbuffersDecode(base64Decode)
     }
 
-    async executeTransaction(inscription: Inscription, isInscriptionEnd?: boolean): Promise<Array<string>> {
+    async executeTransaction(inscription: Inscription): Promise<Array<string>> {
         if (!inscription?.content || !inscription?.inscriptionId) {
             throw new Error(`Inscription content or inscription id cannot be empty`)
         }
@@ -53,9 +53,10 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         let xvmFrom: string = ''
         let xvmTo: string = ''
         let logIndex: number = 0
-        const inscriptionHash = `0x${inscription.inscriptionId.slice(0, -2)}`
+        const inscriptionHash = `0x${inscription.hash}`
         let isPreExecutionInscription = false
         // command list
+        this.logger.debug(`inscriptionCommandList:${JSON.stringify(inscriptionCommandList)}`)
         for (let index = 0; index < inscriptionCommandList.length; index++) {
             const inscriptionCommand = inscriptionCommandList[index]
             const actionEnum = inscriptionCommand.action as InscriptionActionEnum
@@ -126,7 +127,8 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         // Pre-execution inscription rewards
         // Normal inscription rewards
         const toRewards = isPreExecutionInscription ? this.defaultConf.xvm.sysXvmAddress : xvmFrom
-        if (!isPreExecutionInscription || isInscriptionEnd) {
+        this.logger.debug("isPreExecutionInscription",isPreExecutionInscription)
+        if (!isPreExecutionInscription) {
             const hash = await this.xvmService.rewardsTransfer(toRewards).catch(error => {
                 throw new Error(`inscription rewards fail. sysAddress: ${this.xvmService.sysAddress} to: ${toRewards} inscriptionId: ${inscription.inscriptionId}\n ${error?.stack}`)
             })
@@ -239,7 +241,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
                 for (let i = 0; i < transactions?.contentLength(); i++) {
                     const content = transactions.content(i)
                     const action = content?.action()
-                    if (!content || !action) {
+                    if (!content || action === undefined || action === null) {
                         continue
                     }
                     // check data

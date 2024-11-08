@@ -14,10 +14,11 @@ import { BtcHistoryTx } from 'src/entities/sqlite-entities/btc-history-tx.entity
 import { PreExecutionModule } from 'src/pre-execution/pre-execution.module';
 import { PreBroadcastTxItem } from 'src/entities/pre-broadcast-tx-item.entity';
 import { LastConfig } from 'src/entities/last-config.entity';
+import { PreBroadcastTx } from 'src/entities/pre-broadcast-tx.entity';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([BlockHashSnapshot, LastConfig, PreBroadcastTxItem]),
+        TypeOrmModule.forFeature([BlockHashSnapshot, LastConfig, PreBroadcastTxItem,PreBroadcastTx]),
         IndexerModule,
         RouterModule,
         XvmModule,

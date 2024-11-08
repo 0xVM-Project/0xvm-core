@@ -215,6 +215,7 @@ function getSpendables(
 }
 
 async function checkCommitTx(tx: string, amount: number, payAddress: string) {
+  console.debug(`tx: ${tx} amount: ${amount} payAddress: ${payAddress}`)
   const validTx = Transaction.fromHex(tx).outs.find((out) => {
     return (
       out.value === amount &&

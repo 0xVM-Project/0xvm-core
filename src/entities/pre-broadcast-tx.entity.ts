@@ -67,6 +67,17 @@ export class PreBroadcastTx {
   receiverAddress: string;
 
   @Column({
+    name: 'temporary_address',
+    type: 'varchar',
+    length: 256,
+    nullable: false,
+    default: '',
+    charset: 'utf8mb4',
+    collation: 'utf8mb4_general_ci',
+  })
+  temporaryAddress: string;
+
+  @Column({
     name: 'fee_rate',
     type: 'int',
     nullable: false,
@@ -76,13 +87,13 @@ export class PreBroadcastTx {
   feeRate: number;
 
   @Column({
-    name: 'deposit_amount',
+    name: 'amount',
     type: 'int',
     nullable: false,
     default: 0,
     unsigned: true,
   })
-  depositAmount: number;
+  amount: number;
 
   @Column({
     name: 'commit_tx',

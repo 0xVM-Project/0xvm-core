@@ -75,7 +75,7 @@ export class XvmService {
         if (!ethers.isAddress(address)) {
             throw new Error(`Get nonce fail. invalid address`)
         }
-        if (address in this.userNonce) {
+        if (address in this.userNonce && this.userNonce[address]) {
             return this.userNonce[address]
         } else {
             const response = await this.rpcClient<XvmRpcBaseResponse>('eth_getTransactionCount', [address, "pending"])

@@ -76,4 +76,37 @@ export class IndexerService {
         const fundsSources = utxoSourcesTx.result.vout[fundsTx.result.vin[0].vout]
         return fundsSources.scriptPubKey.address
     }
+
+    async fetchNormalInscription0xvmByBlock(blockHeight: number){
+        if (Number.isNaN(blockHeight)) {
+            throw new Error(`blockHeight cannot be nan`)
+        }
+        const { inscriptionList, nextblockhash, blockTimestamp, blockHash } = await this.ordService.getInscriptionByBlockHeight(Number(blockHeight))
+
+        const allInscriptionCount = inscriptionList.length
+        const inscriptionFor0xvmList: Array<Inscription> = []
+        for await (const inscription of inscriptionList) {
+            const { inscriptionId, content, hash } = inscription
+            const inscriptionContent: Inscription = {
+                blockHeight: Number(blockHeight),
+                inscriptionId: inscriptionId,
+                content: content,
+                contentLength: inscription.contentLength,
+                contentType: inscription.contentType,
+                timestamp: blockTimestamp,
+                hash
+            }
+            const inscriptionFor0xvm = this.routerService.from(inscriptionContent.content).isPrecomputeInscription(inscriptionContent.content)
+            if (inscriptionFor0xvm && inscriptionFor0xvm.isPrecompute) {
+                inscriptionFor0xvmList.push(inscriptionContent)
+            }
+        }
+        return {
+            inscriptionList: inscriptionFor0xvmList,
+            nextBlockHash: nextblockhash,
+            blockHash: blockHash,
+            allInscriptionCount: allInscriptionCount,
+            blockTimestamp: blockTimestamp
+        }
+    }
 }
