@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Timeout,Interval } from '@nestjs/schedule';
-import { OrdinalsService } from 'src/common/api/ordinals/ordinals.service';
+import { Interval, Timeout } from '@nestjs/schedule';
 import { CoreService } from 'src/core/core.service';
 import { InscribeService } from 'src/inscribe/inscribe.service';
 
@@ -23,25 +22,25 @@ export class TaskService {
     }
   }
 
-  // @Timeout(5000)
-  // @Interval(10000)
-  // async handleExecute() {
-  //   try {
-  //     this.logger.log('Execute service startup');
-  //     await this.coreService.execution();
-  //   } catch (error) {
-  //     this.logger.error(error instanceof Error ? error.stack : error);
-  //   }
-  // }
+  @Timeout(5000)
+  @Interval(5000)
+  async handleExecute() {
+    try {
+      this.logger.log('Execute service startup');
+      await this.coreService.execution();
+    } catch (error) {
+      this.logger.error(error instanceof Error ? error.stack : error);
+    }
+  }
 
-  // @Timeout(10000)
-  // @Interval(10000)
-  // async handleInscribe() {
-  //   try {
-  //     this.logger.log('Inscribe service startup');
-  //     await this.inscribeService.preCommit();
-  //   } catch (error) {
-  //     this.logger.error(error instanceof Error ? error.stack : error);
-  //   }
-  // }
+  @Timeout(10000)
+  @Interval(10000)
+  async handleInscribe() {
+    try {
+      this.logger.log('Inscribe service startup');
+      await this.inscribeService.run();
+    } catch (error) {
+      this.logger.error(error instanceof Error ? error.stack : error);
+    }
+  }
 }
