@@ -20,6 +20,7 @@ export default registerAs('defalut', () => ({
         bitcoinRpcUser: process.env.BITCOIN_RPC_USER ?? 'user',
         bitcoinRpcPassword: process.env.BITCOIN_RPC_PASSWORD ?? 'password',
         confirmBlockHeight: parseInt(process.env.CONFIRM_BLOCK_HEIGHT ?? '0', 10),
+        btcDepositAddress: process.env.BTC_DEPOSIT_ADDRESS ?? ''
     },
     ordinals: {
         ordUrl: removeTrailingSlash(process.env.ORD_URL ?? '')
