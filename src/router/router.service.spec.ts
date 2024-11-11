@@ -59,8 +59,8 @@ describe('ProtocolService', () => {
     console.log(`txHashList:${JSON.stringify(txHashList, null, 2)}`)
   })
 
-  it.only('deposit command', async () => {
-    const inscriptionContent = '0f0001DAAAAAAABgAIAAQABgAAAAQAAAABAAAADAAAAAgADAAIAAQACAAAAAgAAAAEAAAAmAAAADB4Zjg0OTgwODA4MDgwODA4MDFjYTBhY2M2OTI3MjJkYWViYjZhYWE0MmY0OTU5NzlmN2IzNzk1Mzc2NTFmZjkzMTcxYTBiODI1ZDA0MTllNzcxYmMzYTA0MWJjNWZmNzZhZGIxODA0NTFlYTQ5N2Y3OWMyMWE4MGM5MmIzYjVlODFlNTI5NTY5MzZmMjczODI3MTE2NTFlAAAAAA'
+  it('deposit command', async () => {
+    const inscriptionContent = '0f0001DAAAAAAABgAIAAQABgAAAAQAAAABAAAADAAAAAgADAAIAAQACAAAAAgAAAAEAAAAxgAAADB4Zjg2MDgwODA4MDk0OTA0YjBlZDIzZWU1ZWUwMzg2ODBhMTI4YzBkMGQwMGYxNjE4YWNmMzgzMGY0MjQwODAxY2EwNWQwN2U0ODFlMzE3ZTdmNDA1YmUyYzQ4ZmM5NGQwMTFhMDBmM2ViMDBhNTIyZTE1MzQ3OTFhMjMwYzMxNjk0N2EwNjY3ZTVmZDBjNTNjNGMxYTc2M2UzZDMwYWYzODQ3YzQ3NTc5MTFiMWQ4YzE4MGQyMzU1Y2E2Nzc2MzJlMDI3YwAA'
     const inscription = {
       inscriptionId: '6e25fcb8ca01f63203de7b2e568d87a1bb198c427d5edf67d6f0f7494b377113i0',
       contentType: '',
@@ -70,5 +70,10 @@ describe('ProtocolService', () => {
     }
     const txHashList = await service.from(inscriptionContent).executeTransaction(inscription)
     console.log(`txHashList:${JSON.stringify(txHashList, null, 2)}`)
+  })
+  it.only('deposit command parse', async () => {
+    const inscriptionContent = '0f0001DAAAAAAABgAIAAQABgAAAAQAAAABAAAADAAAAAgADAAIAAQACAAAAAgAAAAEAAAAxgAAADB4Zjg2MDgwODA4MDk0OTA0YjBlZDIzZWU1ZWUwMzg2ODBhMTI4YzBkMGQwMGYxNjE4YWNmMzgzMGY0MjQwODAxY2EwNWQwN2U0ODFlMzE3ZTdmNDA1YmUyYzQ4ZmM5NGQwMTFhMDBmM2ViMDBhNTIyZTE1MzQ3OTFhMjMwYzMxNjk0N2EwNjY3ZTVmZDBjNTNjNGMxYTc2M2UzZDMwYWYzODQ3YzQ3NTc5MTFiMWQ4YzE4MGQyMzU1Y2E2Nzc2MzJlMDI3YwAA'
+    const command = service.from(inscriptionContent).decodeInscription(inscriptionContent)
+    console.log(command)
   })
 });
