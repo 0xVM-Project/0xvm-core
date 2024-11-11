@@ -191,7 +191,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         }
         const { scriptPubKey: { address }, value } = depositOutput
         // If the output1 address is not the deposit address, the deposit is invalid.
-        if (this.defaultConf.bitcoind.btcDepositAddress != address) {
+        if (this.defaultConf.wallet.fundingAddress != address) {
             this.logger.warn(`Invalid deposit. Invalid funds deposit address. inscriptionId:${inscription.inscriptionId} sender:${unSignTransaction.from}  deposit system address:${address}`)
             return null
         }
