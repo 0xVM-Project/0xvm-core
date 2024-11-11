@@ -45,13 +45,9 @@ export class InscribeService {
   }
 
   async create(preBroadcastTx: PreBroadcastTx, feeRate: number) {
-    this.logger.debug('create preBroadcastTx:');
-    this.logger.debug(preBroadcastTx);
     const preBroadcastTxList = await this.preBroadcastTxItem.find({
       where: { preExecutionId: preBroadcastTx.id },
     });
-    this.logger.debug('preBroadcastTxList:');
-    this.logger.debug(JSON.stringify(preBroadcastTxList));
 
     if (preBroadcastTxList && preBroadcastTxList.length > 0) {
       const content = this.routerService.from('0f0001').encodeInscription(
@@ -60,8 +56,6 @@ export class InscribeService {
           data: _preBroadcastTxItem?.data,
         })),
       );
-      this.logger.debug('content:');
-      this.logger.debug(JSON.stringify(content));
 
       if (content) {
         const receiverAddress = this.defaultConf.wallet.fundingAddress;
@@ -70,8 +64,6 @@ export class InscribeService {
           receiverAddress,
           feeRate,
         );
-        this.logger.debug('receiverAddress:');
-        this.logger.debug(receiverAddress);
 
         const inscribeId = crypto.randomUUID();
 
@@ -103,15 +95,11 @@ export class InscribeService {
   }
 
   async transfer(preBroadcastTx: PreBroadcastTx) {
-    this.logger.debug('transfer preBroadcastTx:');
-    this.logger.debug(preBroadcastTx);
     const transferResult = await this.bTCTransaction.transfer(
       preBroadcastTx.temporaryAddress,
       preBroadcastTx.amount,
       preBroadcastTx.feeRate,
     );
-    this.logger.debug('transferResult:');
-    this.logger.debug(transferResult);
 
     if (transferResult && transferResult) {
       try {
@@ -136,8 +124,6 @@ export class InscribeService {
   }
 
   async commit(preBroadcastTx: PreBroadcastTx) {
-    this.logger.debug('commit preBroadcastTx:');
-    this.logger.debug(preBroadcastTx);
     const revealResult = await createReveal(
       preBroadcastTx.privateKey,
       preBroadcastTx.content,
@@ -220,8 +206,6 @@ export class InscribeService {
         },
       ),
     );
-    this.logger.debug('feeSummary.data:');
-    this.logger.debug(JSON.stringify(feeSummary.data));
 
     if (
       feeSummary &&
@@ -233,8 +217,6 @@ export class InscribeService {
         (_item) => _item?.title === 'Avg',
       )?.feeRate;
 
-      this.logger.debug('feeRate:');
-      this.logger.debug(JSON.stringify(feeRate));
       feeRate = 10;
 
       if (feeRate && feeRate > 0 && feeRate <= 10) {
@@ -246,8 +228,6 @@ export class InscribeService {
             id: 'ASC',
           },
         });
-        this.logger.debug('pendingTx:');
-        this.logger.debug(JSON.stringify(pendingTx));
 
         if (pendingTx) {
           await this.commit(pendingTx);
@@ -260,8 +240,6 @@ export class InscribeService {
               id: 'ASC',
             },
           });
-          this.logger.debug('readyTx:');
-          this.logger.debug(JSON.stringify(readyTx));
 
           if (readyTx) {
             await this.transfer(readyTx);
@@ -274,8 +252,6 @@ export class InscribeService {
                 id: 'ASC',
               },
             });
-            this.logger.debug('initialTx:');
-            this.logger.debug(initialTx);
 
             if (initialTx) {
               await this.create(initialTx, feeRate);

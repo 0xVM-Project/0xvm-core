@@ -29,6 +29,7 @@ export class CoreService {
     private diffBlock: number
     private isExecutionRunning:boolean;
     private syncStatus: { isSuccess: boolean, latestBtcBlockHeight: number }
+    public isExecutionTaskStop: boolean;
 
     constructor(
         @Inject(defaultConfig.KEY) private readonly defaultConf: ConfigType<typeof defaultConfig>,
@@ -55,6 +56,7 @@ export class CoreService {
             latestBtcBlockHeight: this.firstInscriptionBlockHeight
         }
         this.isExecutionRunning = false
+        this.isExecutionTaskStop=false;
     }
 
     get getSyncStatus(): { isSuccess: boolean, latestBtcBlockHeight: number } {
@@ -183,10 +185,13 @@ export class CoreService {
         await this.sync()
     }
 
+    /**
+     * execution of transactions, including normal and pre-executed transactions
+     */
     async execution() {
-        this.logger.debug("execution")
         const syncStatus = this.getSyncStatus;
 
+        // sync completed and not executing
         if(!this.isExecutionRunning && syncStatus.isSuccess){
             this.isExecutionRunning = true;
             let lastBtcBlockHeight = syncStatus.latestBtcBlockHeight;
@@ -197,6 +202,7 @@ export class CoreService {
                 },
             });
 
+            // if the lastBtcBlockHeight has already been set, use it, otherwise use syncStatus.latestBtcBlockHeight
             if(lastConfig && lastConfig?.length > 0){
                 const _lastBtcBlockHeight = lastConfig?.[0]?.lastBtcBlockHeight;
 
@@ -207,9 +213,11 @@ export class CoreService {
                 await this.lastConfig.save(this.lastConfig.create());
             }
              
+            // get latest online btc block height
             const btcLatestBlockNumber = await this.indexerService.getLatestBlockNumberForBtc();
 
             if(btcLatestBlockNumber){
+                // when online btc block height bigger than last btc block height
                 if(btcLatestBlockNumber > lastBtcBlockHeight){
                     let retryTotal = 0
 
@@ -218,19 +226,22 @@ export class CoreService {
                             if (retryTotal > 6) {
                                 this.logger.warn(`normalExecution run retry failed several times, please manually process`)
                                 this.isExecutionRunning = false;
+                                this.isExecutionTaskStop = true;
                                 break
                             }else{
                                 const unPackagedTx = await this.preBroadcastTx.exists({where:{status:0}})
 
+                                // if there is a transaction that has not yet been packaged then package the pre-executed transaction before executing the normal transaction, otherwise execute the normal transaction before executing the pre-executed transaction.
                                 if(unPackagedTx){
                                     await this.preExecution(true);
-                                    await this.normalExecution(btcLatestBlockNumber+1);
+                                    await this.normalExecution(lastBtcBlockHeight+1);
                                 }else{
-                                    await this.normalExecution(btcLatestBlockNumber+1);
+                                    await this.normalExecution(lastBtcBlockHeight+1);
                                     await this.preExecution();
                                 }
 
-                                await this.lastConfig.update({},{lastBtcBlockHeight:btcLatestBlockNumber+1})
+                                // save lastBtcBlockHeight when completed
+                                await this.lastConfig.update({},{lastBtcBlockHeight:lastBtcBlockHeight+1})
                                 this.isExecutionRunning = false;
                                 break
                             }
@@ -249,6 +260,7 @@ export class CoreService {
                             if (retryTotal > 6) {
                                 this.logger.warn(`preExecution run retry failed several times, please manually process`)
                                 this.isExecutionRunning = false;
+                                this.isExecutionTaskStop = true;
                                 break
                             }else{
                                 await this.preExecution();
@@ -268,54 +280,64 @@ export class CoreService {
     }
 
     async normalExecution(btcLatestBlockNumber:number) {
-        this.logger.debug("normalExecution")
+        // initial nonce
         this.xvmService.initNonce()
+        // get eligible inscriptions
         const { inscriptionList } = await this.indexerService.fetchNormalInscription0xvmByBlock(btcLatestBlockNumber);
+        // get latest xvm block height
+        const xvmLatestBlockNumber = await this.xvmService.getLatestBlockNumber();
         const hashList: string[] = [];
         let lastTxHash: string = '';
 
-        if(inscriptionList && inscriptionList?.length > 0){
+        if(!isNaN(xvmLatestBlockNumber) && inscriptionList && inscriptionList?.length > 0){
             for (let index = 0; index < inscriptionList.length; index++) {
                 const inscription = inscriptionList[index]
                 const protocol = this.routerService.from(inscription.content)
+                // execute transaction from inscription content
                 const _hashList = await protocol.executeTransaction(inscription)
     
                 if(_hashList && _hashList?.length > 0){
-                    hashList.push(..._hashList)
-                    lastTxHash = inscription.hash
-                    const decodeInscriptionList = protocol.decodeInscription(inscription.content) as CommandsV1Type[]
+                    hashList.push(..._hashList);
+                    lastTxHash = inscription.hash;
+                    // decode inscription content to transactions
+                    const decodeInscriptionList = protocol.decodeInscription(inscription.content) as CommandsV1Type[];
     
                     if(decodeInscriptionList && decodeInscriptionList?.length > 0){
+                        // save decoded transactions
                         await this.preBroadcastTxItem.save(
                             this.preBroadcastTxItem.create(
                                 decodeInscriptionList.map((_decodeInscriptionItem) => ({
                                     action: _decodeInscriptionItem.action,
                                     data: _decodeInscriptionItem.data??"",
-                                    xvmBlockHeight: btcLatestBlockNumber
-                              })),
+                                    // set current btc block height as xvmBlockHeight for hashMapping
+                                    xvmBlockHeight: xvmLatestBlockNumber+1
+                                })),
                             ),
-                          );
+                        );
                     }
                 }
             }
 
             try {
                 if(lastTxHash){
+                    // update lastTxHash
                     await this.lastConfig.update({},{lastTxHash})
                 }
             } catch (error) {
-                this.logger.error("add lastTxHsh failed")
+                this.logger.error("update lastTxHsh failed")
                 throw error
             }
         }
     }
     
     async preExecution(onlyReward?:boolean) {
-        this.logger.debug("preExecution")
         this.xvmService.initNonce()
+
         if(onlyReward){
+            // reward only, not execute
             await this.preExecutionService.reward(); 
         }else{
+            // execute and reward
             await this.preExecutionService.execute(); 
         }
     }

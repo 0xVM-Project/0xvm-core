@@ -44,7 +44,6 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         if (!inscription?.content || !inscription?.inscriptionId) {
             throw new Error(`Inscription content or inscription id cannot be empty`)
         }
-        // ba6307750d57b99a5ffa0bac2b1fd7efc5953d8f094bf56bcbd298c5e621a61bi0
         if (inscription.inscriptionId.length != 66) {
             throw new Error(`Invalid inscription id, length must be 64, currently ${inscription.inscriptionId?.length}`)
         }
@@ -55,8 +54,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         let logIndex: number = 0
         const inscriptionHash = `0x${inscription.hash}`
         let isPreExecutionInscription = false
-        // command list
-        this.logger.debug(`inscriptionCommandList:${JSON.stringify(inscriptionCommandList)}`)
+        
         for (let index = 0; index < inscriptionCommandList.length; index++) {
             const inscriptionCommand = inscriptionCommandList[index]
             const actionEnum = inscriptionCommand.action as InscriptionActionEnum
@@ -124,10 +122,8 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
             }
         }
 
-        // Pre-execution inscription rewards
-        // Normal inscription rewards
+        // normal inscription rewards
         const toRewards = isPreExecutionInscription ? this.defaultConf.xvm.sysXvmAddress : xvmFrom
-        this.logger.debug("isPreExecutionInscription",isPreExecutionInscription)
         if (!isPreExecutionInscription) {
             const hash = await this.xvmService.rewardsTransfer(toRewards).catch(error => {
                 throw new Error(`inscription rewards fail. sysAddress: ${this.xvmService.sysAddress} to: ${toRewards} inscriptionId: ${inscription.inscriptionId}\n ${error?.stack}`)

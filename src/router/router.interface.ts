@@ -1,7 +1,7 @@
 export interface IProtocol<I, C> {
     filterInscription(inscriptions: I): I | null
     decodeInscription(inscriptionContent: string): Array<C>
-    executeTransaction(inscription: I, isInscriptionEnd?: boolean): Promise<Array<string>>
+    executeTransaction(inscription: I): Promise<Array<string>>
     encodeInscription(inscriptionArray: Array<C>): string | null
 
     /** protocol action

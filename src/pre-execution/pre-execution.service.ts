@@ -36,10 +36,12 @@ export class PreExecutionService {
   ) {}
 
   async execute() {
+    // get latest xvm block height
     const xvmLatestBlockNumber = await this.xvmService.getLatestBlockNumber();
 
     if (!isNaN(xvmLatestBlockNumber)) {
       const xvmCurrentBlockNumber = xvmLatestBlockNumber + 1;
+      // get pre-executed transactions from db
       const preTransactionList = await this.pendingTx.find({
         where: { status: 1 },
       });
@@ -53,6 +55,7 @@ export class PreExecutionService {
         const protocol: IProtocol<any, any> = this.routerService.from('0f0001');
 
         try {
+          // get unpacked transaction
           const packagePreBroadcastTx = await this.preBroadcastTx.findOne({
             where: { status: 0 },
             order: {
@@ -67,6 +70,7 @@ export class PreExecutionService {
             });
 
             if (preBroadcastTxItemList && preBroadcastTxItemList?.length > 0) {
+              // if there are unpacked transactions then add up the lengths of all the transaction items
               decodeInscriptionString = protocol.encodeInscription(
                 preBroadcastTxItemList,
               );
@@ -93,25 +97,22 @@ export class PreExecutionService {
               content &&
               decodeInscriptionString.length < this.maxInscriptionSize
             ) {
-              // more than one preTransaction
+              // when the length of all unpacked transactions does not exceed the upper limit
               decodeInscriptionString += content;
               decodeInscriptionList = decodeInscriptionList.concat(
                 protocol.decodeInscription(content),
               );
+              // should be update db data
               availablePreTransactionList.push(preTransaction);
 
               if (decodeInscriptionString.length >= this.maxInscriptionSize) {
+                // if the limit is exceeded by adding the next one, set the current transaction to the should-pack status
+                // the actual execution here will exceed the size of the upper limit of one transaction length, but it doesn't matter.
                 isInscriptionEnd = true;
                 break;
               }
             }
           }
-
-          this.logger.debug(
-            'decodeInscriptionString.length',
-            decodeInscriptionString.length,
-          );
-          this.logger.debug('isInscriptionEnd', isInscriptionEnd);
 
           if (
             decodeInscriptionString &&
@@ -147,14 +148,12 @@ export class PreExecutionService {
                 content,
                 hash: xvmCurrentBlockNumber.toString().padStart(64, '0'),
               };
-              this.logger.debug(`inscription: ${JSON.stringify(inscription)}`);
-              const hashList = await protocol.executeTransaction(
-                inscription,
-                isInscriptionEnd,
-              );
+              // assemble the transaction parameters and then execute
+              const hashList = await protocol.executeTransaction(inscription);
 
               if (hashList && hashList?.length > 0) {
                 try {
+                  // save executed transaction items
                   const result = await this.preBroadcastTxItem.save(
                     this.preBroadcastTxItem.create(
                       txList.map((_tx) => ({
@@ -162,6 +161,7 @@ export class PreExecutionService {
                         action: _tx.action,
                         data: _tx.data ?? '',
                         type: 2,
+                        // set current btc block height as xvmBlockHeight for hashMapping
                         xvmBlockHeight: xvmCurrentBlockNumber,
                       })),
                     ),
@@ -169,7 +169,9 @@ export class PreExecutionService {
 
                   if (result && result?.length > 0) {
                     if (isInscriptionEnd) {
+                      // if current transactions should be packaged
                       const toRewards = this.defaultConf.xvm.sysXvmAddress;
+                      // inscription reward
                       const rewardHash = await this.xvmService
                         .rewardsTransfer(toRewards)
                         .catch((error) => {
@@ -177,7 +179,6 @@ export class PreExecutionService {
                             `inscription rewards fail. sysAddress: ${this.xvmService.sysAddress} to: ${toRewards} inscriptionId: ${inscription.inscriptionId}\n ${error?.stack}`,
                           );
                         });
-                      this.logger.debug('rewardHash', rewardHash);
 
                       if (rewardHash) {
                         const _preBroadcastTxList =
@@ -189,11 +190,8 @@ export class PreExecutionService {
                           xToAddress: toRewards,
                           btcHash: `0x${xvmCurrentBlockNumber.toString().padStart(64, '0')}`,
                           xvmHash: rewardHash,
-                          logIndex: _preBroadcastTxList?.length,
+                          logIndex: _preBroadcastTxList?.length ?? 0,
                         });
-                        this.logger.log(
-                          `[${inscription?.blockHeight}] Send Inscription Rewards[546*(10^8)] success, hash: ${rewardHash}`,
-                        );
                       }
 
                       const lastConfig = await this.lastConfig.find({
@@ -213,11 +211,8 @@ export class PreExecutionService {
                             },
                             order: { id: 'ASC' },
                           });
-                        this.logger.debug('firstPreBroadcastTxItem:');
-                        this.logger.debug(
-                          JSON.stringify(firstPreBroadcastTxItem),
-                        );
 
+                        // update transaction item where action=0
                         await this.preBroadcastTxItem.update(
                           { id: firstPreBroadcastTxItem.id },
                           {
@@ -225,6 +220,7 @@ export class PreExecutionService {
                           },
                         );
 
+                        // set rewardHash as xvmBlockHash(inscription hash)
                         await this.preBroadcastTx.update(
                           { id: preBroadcastTxId },
                           {
@@ -234,6 +230,7 @@ export class PreExecutionService {
                           },
                         );
 
+                        // set rewardHash as lastTxHash or previous
                         await this.lastConfig.update(
                           {},
                           { lastTxHash: rewardHash },
@@ -241,6 +238,7 @@ export class PreExecutionService {
                       }
                     }
 
+                    // set pre execution transactions to completed status
                     await this.pendingTx.update(
                       {
                         id: In(
@@ -267,6 +265,7 @@ export class PreExecutionService {
   }
 
   async reward() {
+    // get latest xvm block height
     const xvmLatestBlockNumber = await this.xvmService.getLatestBlockNumber();
 
     if (!isNaN(xvmLatestBlockNumber)) {
@@ -278,6 +277,7 @@ export class PreExecutionService {
           id: 'ASC',
         },
       });
+
       if (preBroadcastTx) {
         preBroadcastTxId = preBroadcastTx.id;
 
@@ -323,8 +323,6 @@ export class PreExecutionService {
                   },
                   order: { id: 'ASC' },
                 });
-              this.logger.debug('firstPreBroadcastTxItem:');
-              this.logger.debug(JSON.stringify(firstPreBroadcastTxItem));
 
               try {
                 await this.preBroadcastTxItem.update(
