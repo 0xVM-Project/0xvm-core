@@ -123,6 +123,7 @@ export class CoreService {
         // Synchronous execution start time
         const syncExecutionStartTime = latestBlockTimestampBy0xvm
         while (true) {
+            this.logger.log(`Start executing synchronized historical transactions`)
             this.xvmService.initNonce()
             history = await this.btcHistoryTxRepository.find({
                 where: { blockTimestamp: MoreThan(syncExecutionStartTime), sort: MoreThan(nextSort) },
@@ -173,6 +174,7 @@ export class CoreService {
                 )
             }
         }
+        this.logger.log(`↪ Synchronizing historical transactions completed ↩`)
         this.syncStatus.isSuccess = true
     }
 
