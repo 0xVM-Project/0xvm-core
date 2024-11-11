@@ -64,7 +64,7 @@ export class InscribeService {
       this.logger.debug(JSON.stringify(content));
 
       if (content) {
-        const receiverAddress = this.defaultConf.xvm.sysBtcAddress;
+        const receiverAddress = this.defaultConf.wallet.fundingAddress;
         const { payPrivateKey, payAddress, amount } = await createCommit(
           content,
           receiverAddress,
