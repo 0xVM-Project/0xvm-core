@@ -37,7 +37,7 @@ export class OrdService {
         for (const tx of block.result.tx) {
             const inscription = this.ordService.getInscriptionContentData(tx.txid, tx.vin[0].txinwitness)
             if (inscription) {
-                inscriptionList.push({...inscription, hash:tx?.hash??""})
+                inscriptionList.push({ ...inscription, hash: tx?.txid ?? "" })
                 this.outputFor0xvm[tx.txid] = tx.vout
             }
         }
@@ -50,15 +50,19 @@ export class OrdService {
     }
 
     async getInscriptionTxOutput(txid: string, index = 1): Promise<BlockTxOutput | null> {
-        if (this.outputFor0xvm && txid in this.outputFor0xvm && this.outputFor0xvm[txid].length > index) {
-            return this.outputFor0xvm[txid].at(index) ?? null
-        } else {
-            const { result } = await this.btcrpcService.getRawtransaction(txid)
-            const vout = result.vout
-            if (vout.length < index + 1) {
-                return null
+        try {
+            if (this.outputFor0xvm && txid in this.outputFor0xvm && this.outputFor0xvm[txid].length > index) {
+                return this.outputFor0xvm[txid].at(index) ?? null
+            } else {
+                const { result } = await this.btcrpcService.getRawtransaction(txid)
+                const vout = result.vout
+                if (vout.length < index + 1) {
+                    return null
+                }
+                return result.vout[index]
             }
-            return result.vout[index]
+        } catch (err) {
+            throw new Error(`Failed to obtain the recharge fund transfer address. txid=${txid}  ${err instanceof Error ? err?.stack : err}`)
         }
     }
 }
