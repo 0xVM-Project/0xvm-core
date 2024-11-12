@@ -283,13 +283,13 @@ export class CoreService {
         // initial nonce
         this.xvmService.initNonce()
         // get eligible inscriptions
-        const { inscriptionList } = await this.indexerService.fetchNormalInscription0xvmByBlock(btcLatestBlockNumber);
+        const { inscriptionList, blockTimestamp } = await this.indexerService.fetchNormalInscription0xvmByBlock(btcLatestBlockNumber);
         // get latest xvm block height
         const xvmLatestBlockNumber = await this.xvmService.getLatestBlockNumber();
-        const hashList: string[] = [];
         let lastTxHash: string = '';
-
         if(!isNaN(xvmLatestBlockNumber) && inscriptionList && inscriptionList?.length > 0){
+            let decodeInscriptionList:CommandsV1Type[] = []
+
             for (let index = 0; index < inscriptionList.length; index++) {
                 const inscription = inscriptionList[index]
                 const protocol = this.routerService.from(inscription.content)
@@ -297,35 +297,38 @@ export class CoreService {
                 const _hashList = await protocol.executeTransaction(inscription)
     
                 if(_hashList && _hashList?.length > 0){
-                    hashList.push(..._hashList);
                     lastTxHash = inscription.hash;
                     // decode inscription content to transactions
-                    const decodeInscriptionList = protocol.decodeInscription(inscription.content) as CommandsV1Type[];
-    
-                    if(decodeInscriptionList && decodeInscriptionList?.length > 0){
-                        // save decoded transactions
-                        await this.preBroadcastTxItem.save(
-                            this.preBroadcastTxItem.create(
-                                decodeInscriptionList.map((_decodeInscriptionItem) => ({
-                                    action: _decodeInscriptionItem.action,
-                                    data: _decodeInscriptionItem.data??"",
-                                    // set current btc block height as xvmBlockHeight for hashMapping
-                                    xvmBlockHeight: xvmLatestBlockNumber+1
-                                })),
-                            ),
-                        );
-                    }
+                    decodeInscriptionList = decodeInscriptionList.concat(protocol.decodeInscription(inscription.content) as CommandsV1Type[]);
                 }
             }
 
-            try {
-                if(lastTxHash){
-                    // update lastTxHash
-                    await this.lastConfig.update({},{lastTxHash})
+            if(decodeInscriptionList && decodeInscriptionList?.length > 0){
+                // mineBlock
+                const minterBlockHash = await this.xvmService.minterBlock(blockTimestamp);
+                this.logger.log(`Precompute Inscription Generate Block ${btcLatestBlockNumber} is ${minterBlockHash}`);
+
+                // save decoded transactions
+                await this.preBroadcastTxItem.save(
+                    this.preBroadcastTxItem.create(
+                        decodeInscriptionList.map((_decodeInscriptionItem) => ({
+                            action: _decodeInscriptionItem.action,
+                            data: _decodeInscriptionItem.data??"",
+                            // set current btc block height as xvmBlockHeight for hashMapping
+                            xvmBlockHeight: xvmLatestBlockNumber+1
+                        })),
+                    ),
+                );
+
+                try {
+                    if(lastTxHash){
+                        // update lastTxHash
+                        await this.lastConfig.update({},{lastTxHash})
+                    }
+                } catch (error) {
+                    this.logger.error("update lastTxHsh failed")
+                    throw error
                 }
-            } catch (error) {
-                this.logger.error("update lastTxHsh failed")
-                throw error
             }
         }
     }
