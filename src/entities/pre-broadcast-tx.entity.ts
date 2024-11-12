@@ -7,7 +7,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-@Entity('pre-broadcast-tx')
+@Entity('pre_broadcast_tx')
 export class PreBroadcastTx {
   @PrimaryGeneratedColumn()
   id: number;
