@@ -29,6 +29,7 @@
     "@nestjs/schedule": "^4.1.0",
     "@nestjs/typeorm": "^10.0.2",
     "@sadoprotocol/ordit-sdk": "^2.4.1",
+    "@types/glob": "^8.1.0",
     "axios": "^1.7.2",
     "bech32": "^2.0.0",
     "bip32": "^4.0.0",
