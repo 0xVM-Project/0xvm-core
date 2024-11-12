@@ -97,7 +97,7 @@ export class IndexerService {
                 hash
             }
             const inscriptionFor0xvm = this.routerService.from(inscriptionContent.content).isPrecomputeInscription(inscriptionContent.content)
-            if (inscriptionFor0xvm && inscriptionFor0xvm.isPrecompute) {
+            if (inscriptionFor0xvm && !inscriptionFor0xvm.isPrecompute) {
                 inscriptionFor0xvmList.push(inscriptionContent)
             }
         }
