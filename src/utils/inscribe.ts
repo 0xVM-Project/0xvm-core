@@ -209,6 +209,7 @@ function getSpendables(
         hex: out.script.toString('hex'),
         type: 'witness_v1_taproot',
       },
+      confirmation:0
     },
   ];
   return Promise.resolve(result);

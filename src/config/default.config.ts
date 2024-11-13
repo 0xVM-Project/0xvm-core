@@ -26,6 +26,7 @@ export default registerAs('defalut', () => ({
     },
     wallet: {
         fundingAddress: process.env.FUNDING_ADDRESS ?? '',
-        walletApiUrl: removeTrailingSlash(process.env.WALLET_API_URL ?? '')
+        walletApiUrl: removeTrailingSlash(process.env.WALLET_API_URL ?? ''),
+        btcFeeRate: process.env.BTC_FEE_RATE ? Number(process.env.BTC_FEE_RATE) : 50
     }
 }))

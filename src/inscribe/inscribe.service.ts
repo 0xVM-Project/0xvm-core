@@ -19,6 +19,8 @@ import { FeeRate, UnisatResponse } from './inscribe.interface';
 export class InscribeService {
   private readonly logger = new Logger(InscribeService.name);
   private readonly bTCTransaction: BTCTransaction;
+  private readonly feeRate: number;
+  private lastFeeRateLog: number = 0;
 
   constructor(
     @InjectRepository(PreBroadcastTx)
@@ -35,6 +37,7 @@ export class InscribeService {
     private readonly routerService: RouterService,
   ) {
     const operatorPrivateKey = this.defaultConf.xvm.operatorPrivateKey;
+    this.feeRate = this.defaultConf.wallet.btcFeeRate;
 
     if (operatorPrivateKey && operatorPrivateKey.startsWith('0x')) {
       this.bTCTransaction = new BTCTransaction(
@@ -217,9 +220,14 @@ export class InscribeService {
         (_item) => _item?.title === 'Avg',
       )?.feeRate;
 
-      feeRate = 10;
+      if (Date.now() - this.lastFeeRateLog > 10 * 60 * 60 * 1000) {
+        this.lastFeeRateLog = Date.now();
+        this.logger.log(
+          `current feeRate: ${feeRate}, expected feeRate: ${this.feeRate}, ${feeRate <= this.feeRate ? '' : ' not eligible, skip'}`,
+        );
+      }
 
-      if (feeRate && feeRate > 0 && feeRate <= 10) {
+      if (feeRate && feeRate > 0 && feeRate <= this.feeRate) {
         const pendingTx = await this.preBroadcastTx.findOne({
           where: {
             status: 3,

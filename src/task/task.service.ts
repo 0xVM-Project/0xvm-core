@@ -30,9 +30,7 @@ export class TaskService {
         const interval = this.schedulerRegistry.getInterval('pre-execute');
         clearInterval(interval);
       } else {
-        this.logger.log('Execute service start');
         await this.coreService.execution();
-        this.logger.log('Execute service end');
       }
     } catch (error) {
       this.logger.error(error instanceof Error ? error.stack : error);
@@ -42,9 +40,7 @@ export class TaskService {
   @Interval(10000)
   async handleInscribe() {
     try {
-      this.logger.log('Inscribe service start');
       await this.inscribeService.run();
-      this.logger.log('Inscribe service end');
     } catch (error) {
       this.logger.error(error instanceof Error ? error.stack : error);
     }
