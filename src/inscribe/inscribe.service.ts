@@ -220,7 +220,7 @@ export class InscribeService {
         (_item) => _item?.title === 'Avg',
       )?.feeRate;
 
-      if (Date.now() - this.lastFeeRateLog > 10 * 60 * 60 * 1000) {
+      if (Date.now() - this.lastFeeRateLog > 10 * 60 * 1000) {
         this.lastFeeRateLog = Date.now();
         this.logger.log(
           `current feeRate: ${feeRate}, expected feeRate: ${this.feeRate}, ${feeRate <= this.feeRate ? '' : ' not eligible, skip'}`,
