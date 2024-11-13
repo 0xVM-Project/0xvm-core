@@ -13,7 +13,7 @@ export class PendingTx {
   @Column({ name: 'from_address', type: 'varchar', length: 128, default: 'withdraw address(btc address)' })
   fromAddress: string
 
-  @Column({ name: 'content', type: 'text', comment: 'inscription content' })
+  @Column({ name: 'content', type: 'mediumtext', comment: 'inscription content' })
   content: string
 
   @Column({ name: 'fee', type: "int", default: 0 , comment: 'fee'})

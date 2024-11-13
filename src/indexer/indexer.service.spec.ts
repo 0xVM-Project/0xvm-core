@@ -5,7 +5,6 @@ import { RouterModule } from 'src/router/router.module';
 import { DataSource } from 'typeorm';
 import { TypeOrmModule, getDataSourceToken } from '@nestjs/typeorm';
 import { HashMapping } from 'src/entities/hash-mapping.entity';
-import { Withdraw } from 'src/entities/withdraw.entity';
 import { OrdModule } from 'src/ord/ord.module';
 import { ConfigModule } from '@nestjs/config';
 import dbMysqlConfig from 'src/config/db-mysql.config';
