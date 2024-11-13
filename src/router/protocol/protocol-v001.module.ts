@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ProtocolV001Service } from './protocol-v001.service';
-import { WithdrawModule } from './withdraw/withdraw.module';
 import { HashMappingModule } from './hash-mapping/hash-mapping.module';
 import { XvmModule } from 'src/xvm/xvm.module';
 import { OrdinalsModule } from 'src/common/api/ordinals/ordinals.module';
@@ -15,7 +14,6 @@ import { BtcrpcModule } from 'src/common/api/btcrpc/btcrpc.module';
     imports: [
         TypeOrmModule.forFeature([BlockHashSnapshot]),
         SqliteModule,
-        WithdrawModule,
         HashMappingModule,
         XvmModule,
         OrdinalsModule,
