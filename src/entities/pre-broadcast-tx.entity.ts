@@ -21,7 +21,7 @@ export class PreBroadcastTx {
     charset: 'utf8mb4',
     collation: 'utf8mb4_general_ci',
   })
-  @Index({ unique: true })
+  @Index()
   inscribeId: string;
 
   @Column({
