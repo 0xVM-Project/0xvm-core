@@ -234,9 +234,9 @@ export class CoreService {
                                 // if there is a transaction that has not yet been packaged then package the pre-executed transaction before executing the normal transaction, otherwise execute the normal transaction before executing the pre-executed transaction.
                                 if(unPackagedTx){
                                     await this.preExecution(true);
-                                    await this.normalExecution(lastBtcBlockHeight+1);
+                                    await this.normalExecution(btcLatestBlockNumber, lastBtcBlockHeight + 1);
                                 }else{
-                                    await this.normalExecution(lastBtcBlockHeight+1);
+                                    await this.normalExecution(btcLatestBlockNumber, lastBtcBlockHeight + 1);
                                     await this.preExecution();
                                 }
 
@@ -279,11 +279,12 @@ export class CoreService {
         }
     }
 
-    async normalExecution(btcLatestBlockNumber:number) {
+    async normalExecution(btcLatestBlockNumber:number, currentBlockNumber:number) {
         // initial nonce
         this.xvmService.initNonce()
         // get eligible inscriptions
-        const { inscriptionList, blockTimestamp } = await this.indexerService.fetchNormalInscription0xvmByBlock(btcLatestBlockNumber);
+        const { inscriptionList, blockTimestamp } = await this.indexerService.fetchNormalInscription0xvmByBlock(currentBlockNumber);
+        this.logger.log(`normalExecution: ${currentBlockNumber}/${btcLatestBlockNumber}, inscriptions-number: ${inscriptionList?.length ?? 0}`)
         // get latest xvm block height
         const xvmLatestBlockNumber = await this.xvmService.getLatestBlockNumber();
         let lastTxHash: string = '';
@@ -306,7 +307,7 @@ export class CoreService {
             if(decodeInscriptionList && decodeInscriptionList?.length > 0){
                 // mineBlock
                 const minterBlockHash = await this.xvmService.minterBlock(blockTimestamp);
-                this.logger.log(`Precompute Inscription Generate Block ${btcLatestBlockNumber} is ${minterBlockHash}`);
+                this.logger.log(`Precompute Inscription Generate Block ${currentBlockNumber} is ${minterBlockHash}`);
 
                 // save decoded transactions
                 await this.preBroadcastTxItem.save(
