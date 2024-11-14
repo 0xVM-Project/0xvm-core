@@ -14,6 +14,7 @@ import { OrdModule } from 'src/ord/ord.module';
 import { RouterModule } from '../router.module';
 import { DataSource } from 'typeorm';
 import { sleep } from 'src/utils/times';
+import { OrdService } from 'src/ord/ord.service';
 
 const depositInscription1 = () => {
     const inscriptionContent = '0f0001DAAAAAAABgAIAAQABgAAAAQAAAABAAAADAAAAAgADAAIAAQACAAAAAgAAAACAAAA2gAAADB4Zjg2YTgwODQxZGNkNjUwMDgyNTIwODk0NjEzOTJmNDk4ZDc3Zjg0NzRlZjdkZDhhZTc0MzM1N2Y5OGE3MjNlYzg3MWZmOTczY2FmYTgwMDA4MDFjYTA5MzE2MmY2MGVmYmYzYzFjYTNhNGNmMzM0NjU2NmEzOTZkZTRiZGU4YWY5ODQyNzMwM2UwODk5MzMxNjJkMjU4YTAzNjRmNzhkODZiYWYzYTJmZmE3NGYwZDQxOWU0NWM2ZTI1ZDZiNzJlNTc5NTdhYjU5NjA3ODRmNDE2YWFlNmE0AAA='
@@ -53,6 +54,7 @@ describe('ProtocolV001Service', () => {
     let protocolV001Service: ProtocolV001Service
     let module: TestingModule
     let dataSource: DataSource;
+    let ordService: OrdService
 
     beforeAll(async () => {
         module = await Test.createTestingModule({
@@ -73,6 +75,7 @@ describe('ProtocolV001Service', () => {
         }).compile();
 
         protocolV001Service = module.get<ProtocolV001Service>(ProtocolV001Service);
+        ordService = module.get<OrdService>(OrdService)
         dataSource = module.get<DataSource>(DataSource);
     });
 
@@ -81,12 +84,9 @@ describe('ProtocolV001Service', () => {
         await module.close()
     })
 
-    it('historyTxSequencer', async () => {
-        const inscriptionList = [
-            depositInscription1(),
-            depositInscription2(),
-            depositInscription3(),
-        ]
-        // await protocolV001Service.historyTxSequencer(inscriptionList)
+    it('parse inscription by txid', async () => {
+        const inscription = await ordService.getInscriptionByTxid(`15dcaab47ea43fb0298d02aacb0f71bc00bbe49db301785a04d9345de6f557b5`)
+        const command = protocolV001Service.decodeInscription(inscription.content)
+        console.log(command)
     })
 });

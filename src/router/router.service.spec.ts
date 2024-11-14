@@ -71,7 +71,7 @@ describe('ProtocolService', () => {
     const txHashList = await service.from(inscriptionContent).executeTransaction(inscription)
     console.log(`txHashList:${JSON.stringify(txHashList, null, 2)}`)
   })
-  it.only('deposit command parse', async () => {
+  it('deposit command parse', async () => {
     const inscriptionContent = '0f0001DAAAAAAABgAIAAQABgAAAAQAAAABAAAADAAAAAgADAAIAAQACAAAAAgAAAAEAAAAxgAAADB4Zjg2MDgwODA4MDk0OTA0YjBlZDIzZWU1ZWUwMzg2ODBhMTI4YzBkMGQwMGYxNjE4YWNmMzgzMGY0MjQwODAxY2EwNWQwN2U0ODFlMzE3ZTdmNDA1YmUyYzQ4ZmM5NGQwMTFhMDBmM2ViMDBhNTIyZTE1MzQ3OTFhMjMwYzMxNjk0N2EwNjY3ZTVmZDBjNTNjNGMxYTc2M2UzZDMwYWYzODQ3YzQ3NTc5MTFiMWQ4YzE4MGQyMzU1Y2E2Nzc2MzJlMDI3YwAA'
     const command = service.from(inscriptionContent).decodeInscription(inscriptionContent)
     console.log(command)

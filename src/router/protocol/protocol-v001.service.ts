@@ -54,7 +54,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         let logIndex: number = 0
         const inscriptionHash = `0x${inscription.hash}`
         let isPreExecutionInscription = false
-        
+
         for (let index = 0; index < inscriptionCommandList.length; index++) {
             const inscriptionCommand = inscriptionCommandList[index]
             const actionEnum = inscriptionCommand.action as InscriptionActionEnum
@@ -237,20 +237,21 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
                 for (let i = 0; i < transactions?.contentLength(); i++) {
                     const content = transactions.content(i)
                     const action = content?.action()
-                    if (!content || action === undefined || action === null) {
+                    const data = content?.data()
+                    if (action === undefined || action === null) {
+                        this.logger.warn(`Command action cannot be null or undefined`)
                         continue
                     }
                     // check data
-                    if (!content.data()?.startsWith('0x')) {
-                        this.logger.warn(`Command data error, must start with 0x.`)
+                    if (data == undefined || data == null) {
+                        this.logger.warn(`Command data cannot be null or undefined`)
                         continue
                     }
                     if (![0, 1, 2, 3, 4, 5, 6].includes(action)) {
                         this.logger.warn(`Command action error, must in [0,1,2,3,4,5,6].`)
                         continue
                     }
-                    const data = content?.data() as `0x${string}`
-                    result.push({ action, data })
+                    result.push({ action: action, data: data })
                 }
             }
         }

@@ -15,6 +15,12 @@ export class OrdService {
         private readonly btcrpcService: BtcrpcService,
     ) { }
 
+    async getInscriptionByTxid(txid: string): Promise<Inscription | null> {
+        const rawTransactionResponse = await this.btcrpcService.getRawtransaction(txid)
+        const tx = rawTransactionResponse.result
+        return this.ordService.getInscriptionContentData(tx.txid, tx.vin[0].txinwitness)
+    }
+
     async getInscriptionByBlockHeight(blockHeight: number) {
         this.outputFor0xvm = {}
         let blockHash = ''

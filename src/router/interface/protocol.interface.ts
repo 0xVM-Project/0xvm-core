@@ -3,5 +3,5 @@ export interface BaseCommandsType {
 }
 
 export interface CommandsV1Type extends BaseCommandsType {
-    data: `0x${string}`
+    data: string
 }
