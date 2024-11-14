@@ -81,10 +81,11 @@ export class IndexerService {
         if (Number.isNaN(blockHeight)) {
             throw new Error(`blockHeight cannot be nan`)
         }
-        const { inscriptionList, nextblockhash, blockTimestamp, blockHash } = await this.ordService.getInscriptionByBlockHeight(Number(blockHeight))
 
+        const { inscriptionList, nextblockhash, blockTimestamp, blockHash } = await this.ordService.getInscriptionByBlockHeight(Number(blockHeight))
         const allInscriptionCount = inscriptionList.length
         const inscriptionFor0xvmList: Array<Inscription> = []
+
         for await (const inscription of inscriptionList) {
             const { inscriptionId, content, hash } = inscription
             const inscriptionContent: Inscription = {
@@ -96,11 +97,21 @@ export class IndexerService {
                 timestamp: blockTimestamp,
                 hash
             }
-            const inscriptionFor0xvm = this.routerService.from(inscriptionContent.content).isPrecomputeInscription(inscriptionContent.content)
-            if (inscriptionFor0xvm && !inscriptionFor0xvm.isPrecompute) {
-                inscriptionFor0xvmList.push(inscriptionContent)
+            const protocol = this.routerService.from(inscriptionContent.content);
+
+            if(protocol){
+                const filterInscription = protocol.filterInscription(inscriptionContent);
+
+                if(filterInscription){
+                    const inscriptionFor0xvm = protocol.isPrecomputeInscription(filterInscription.content)
+
+                    if (inscriptionFor0xvm && !inscriptionFor0xvm.isPrecompute) {
+                        inscriptionFor0xvmList.push(inscriptionContent)
+                    }
+                }
             }
         }
+
         return {
             inscriptionList: inscriptionFor0xvmList,
             nextBlockHash: nextblockhash,
