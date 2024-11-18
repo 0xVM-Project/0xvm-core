@@ -86,15 +86,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
             if (!xvmFrom) {
                 const unSignTransaction = this.xvmService.unSignTransaction(inscriptionCommand.data)
                 if (!unSignTransaction) {
-                    this.logger.warn(`Invalid command hash: ${inscription?.hash} index: ${index}`)
-                    continue
-                }
-                if (!unSignTransaction.from) {
-                    this.logger.warn(`Invalid command hash: ${inscription?.hash} index: ${index}, Unable to parse the from address from signTransaction`)
-                    continue
-                }
-                if (!unSignTransaction.to) {
-                    this.logger.warn(`Invalid command hash: ${inscription?.hash} index: ${index}, Unable to parse the to address from signTransaction`)
+                    this.logger.warn(`unsign transaction fail. Invalid command hash: ${inscription?.hash}, index: ${index}`)
                     continue
                 }
                 xvmFrom = unSignTransaction.from

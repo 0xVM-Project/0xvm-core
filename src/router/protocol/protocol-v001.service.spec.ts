@@ -84,7 +84,7 @@ describe('ProtocolV001Service', () => {
         await module.close()
     })
 
-    it('parse inscription by txid', async () => {
+    it.only('parse inscription by txid', async () => {
         const inscription = await ordService.getInscriptionByTxid(`15dcaab47ea43fb0298d02aacb0f71bc00bbe49db301785a04d9345de6f557b5`)
         const command = protocolV001Service.decodeInscription(inscription.content)
         console.log(command)
