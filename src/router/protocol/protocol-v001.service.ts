@@ -144,7 +144,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         return transactionHash
     }
 
-    async mineBlock(data: string, inscription: Inscription): Promise<string> {
+    async mineBlock(data: string, inscription?: Inscription): Promise<string> {
         const blockHeight = parseInt(data.slice(2, 12), 16)
         const blockTimestamp = parseInt(data.slice(12), 16)
         const minterBlockHash = await this.xvmService.minterBlock(blockTimestamp)

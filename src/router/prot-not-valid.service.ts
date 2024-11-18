@@ -32,7 +32,7 @@ export class ProtNotValidService extends ProtocolBase<Inscription, BaseCommandsT
     */
 
     async prev(data: string, inscription: Inscription): Promise<string | null> { return null }
-    async mineBlock(data: string, inscription: Inscription): Promise<string | null> { return null }
+    async mineBlock(data: string): Promise<string | null> { return null }
     async deploy(data: string, inscription: Inscription): Promise<string | null> { return null }
     async execute(data: string, inscription: Inscription): Promise<string | null> { return null }
     async transfer(data: string, inscription: Inscription): Promise<string | null> { return null }

@@ -18,6 +18,7 @@ import { CommandsV1Type } from 'src/router/interface/protocol.interface';
 import { PreBroadcastTxItem } from 'src/entities/pre-broadcast-tx-item.entity';
 import { LastConfig } from 'src/entities/last-config.entity';
 import { PreBroadcastTx } from 'src/entities/pre-broadcast-tx.entity';
+import { PendingTx } from 'src/entities/pending-tx.entity';
 
 @Injectable()
 export class CoreService {
@@ -33,19 +34,17 @@ export class CoreService {
 
     constructor(
         @Inject(defaultConfig.KEY) private readonly defaultConf: ConfigType<typeof defaultConfig>,
-        @InjectRepository(BlockHashSnapshot) private readonly blockHashSnapshotRepository: Repository<BlockHashSnapshot>,
         @InjectRepository(LastConfig) private readonly lastConfig: Repository<LastConfig>,
         @InjectRepository(PreBroadcastTxItem)
         private readonly preBroadcastTxItem: Repository<PreBroadcastTxItem>,
         private readonly indexerService: IndexerService,
         private readonly routerService: RouterService,
         private readonly xvmService: XvmService,
-        private readonly btcrpcService: BtcrpcService,
         private readonly preExecutionService: PreExecutionService,
         @InjectRepository(BtcHistoryTx, 'sqlite') private btcHistoryTxRepository: Repository<BtcHistoryTx>,
         private readonly sequencerService: SequencerService,
-        @InjectRepository(PreBroadcastTx)
-        private readonly preBroadcastTx: Repository<PreBroadcastTx>,
+        @InjectRepository(PendingTx)
+        private readonly pendingTx: Repository<PendingTx>,
     ) {
         this.firstInscriptionBlockHeight = this.defaultConf.xvm.firstInscriptionBlockHeight
         this.indexerService.getLatestBlockNumberForBtc()
@@ -229,17 +228,8 @@ export class CoreService {
                                 this.isExecutionTaskStop = true;
                                 break
                             }else{
-                                const unPackagedTx = await this.preBroadcastTx.exists({where:{status:0}})
-
-                                // if there is a transaction that has not yet been packaged then package the pre-executed transaction before executing the normal transaction, otherwise execute the normal transaction before executing the pre-executed transaction.
-                                if(unPackagedTx){
-                                    await this.preExecution(true);
-                                    await this.normalExecution(btcLatestBlockNumber, lastBtcBlockHeight + 1);
-                                }else{
-                                    await this.normalExecution(btcLatestBlockNumber, lastBtcBlockHeight + 1);
-                                    await this.preExecution();
-                                }
-
+                                await this.preChunk(true);
+                                await this.normalExecution(btcLatestBlockNumber, lastBtcBlockHeight + 1);
                                 // save lastBtcBlockHeight when completed
                                 await this.lastConfig.update({},{lastBtcBlockHeight:lastBtcBlockHeight+1})
                                 this.isExecutionRunning = false;
@@ -263,7 +253,7 @@ export class CoreService {
                                 this.isExecutionTaskStop = true;
                                 break
                             }else{
-                                await this.preExecution();
+                                await this.preChunk();
                                 this.isExecutionRunning = false;
                                 break
                             }
@@ -334,15 +324,38 @@ export class CoreService {
         }
     }
     
-    async preExecution(onlyReward?:boolean) {
-        this.xvmService.initNonce()
-
-        if(onlyReward){
-            // reward only, not execute
-            await this.preExecutionService.reward(); 
-        }else{
-            // execute and reward
-            await this.preExecutionService.execute(); 
+    async preExecution() {
+        try {
+            this.isExecutionRunning = true;
+            await this.preExecutionService.execute();
+            this.isExecutionRunning = false;
+            return true;
+        } catch (error) {
+            this.isExecutionRunning = false;
+            this.logger.error("preExecution failed")
+            return false;
         }
+    }
+
+    async preChunk(isEnforce?: boolean) {
+        let maxRetryCount = 50;
+        let isPendingTxExists = false;
+
+        do {
+            isPendingTxExists = await this.pendingTx.exists({where:{status:2}});
+
+            if(!isPendingTxExists){
+                break;
+            }
+
+            await this.preExecutionService.chunk(isEnforce);
+            
+            if(!isEnforce) {
+                break;
+            }
+
+            maxRetryCount--;
+            sleep(1000);
+        } while (isPendingTxExists || maxRetryCount > 0);
     }
 }

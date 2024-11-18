@@ -15,10 +15,11 @@ import { PreExecutionModule } from 'src/pre-execution/pre-execution.module';
 import { PreBroadcastTxItem } from 'src/entities/pre-broadcast-tx-item.entity';
 import { LastConfig } from 'src/entities/last-config.entity';
 import { PreBroadcastTx } from 'src/entities/pre-broadcast-tx.entity';
+import { PendingTx } from 'src/entities/pending-tx.entity';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([BlockHashSnapshot, LastConfig, PreBroadcastTxItem,PreBroadcastTx]),
+        TypeOrmModule.forFeature([BlockHashSnapshot, LastConfig, PreBroadcastTxItem,PreBroadcastTx,PendingTx]),
         IndexerModule,
         RouterModule,
         XvmModule,

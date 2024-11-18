@@ -23,6 +23,16 @@ export class PreBroadcastTxItem {
   preExecutionId: number;
 
   @Column({
+    name: 'pending_tx_id',
+    type: 'int',
+    nullable: false,
+    default: 0,
+    unsigned: true,
+  })
+  @Index()
+  pendingTxId: number;
+
+  @Column({
     name: 'type',
     type: 'tinyint',
     nullable: false,

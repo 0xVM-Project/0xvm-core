@@ -6,7 +6,7 @@ export abstract class ProtocolBase<I, C> implements IProtocol<I, C> {
     abstract encodeInscription(inscriptionArray: Array<C>): string | null
     abstract executeTransaction(inscription: I): Promise<Array<string>>
     abstract prev(data: string, inscription: I): Promise<string | null>
-    abstract mineBlock(data: string, inscription: I): Promise<string | null>
+    abstract mineBlock(data: string): Promise<string | null>
     abstract deploy(data: string, inscription: I): Promise<string | null>
     abstract execute(data: string, inscription: I): Promise<string | null>
     abstract transfer(data: string, inscription: I): Promise<string | null>

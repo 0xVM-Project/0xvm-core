@@ -22,7 +22,7 @@ export class PendingTx {
   @Column({ name: 'hash', type: 'varchar', default: ''})
   hash: string
 
-  @Column({ name: 'status', type: 'int', default: 1, comment: '-1:Failed, 0:Pending, 1:Broadcast completed, 2:Pre-Confirmed' })
+  @Column({ name: 'status', type: 'int', default: 1, comment: '-1:Failed, 0:Pending, 1:Ready to execute, 2:Execute completed, 3:Execute failed, 4:Chunk success' })
   status?: number
 
   @CreateDateColumn({ name: 'create_time', type: 'timestamp'})
