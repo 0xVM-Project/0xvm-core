@@ -6,15 +6,22 @@ import { IndexerService } from 'src/indexer/indexer.service';
 import { CommonModule } from 'src/common/common.module';
 import { ProtocolV001Module } from './protocol/protocol-v001.module';
 import { MysqlModule } from 'src/common/mysql/mysql.module';
+import { OrdService } from 'src/ord/ord.service';
+import { OrdModule } from 'src/ord/ord.module';
+import { XvmModule } from 'src/xvm/xvm.module';
+import { XvmService } from 'src/xvm/xvm.service';
+import { CommandsV1Type } from './interface/protocol.interface';
 
 describe('ProtocolService', () => {
   let service: RouterService;
   let indexService: IndexerService
   let module: TestingModule
+  let ordService: OrdService
+  let xvmService: XvmService
 
   beforeAll(async () => {
     module = await Test.createTestingModule({
-      imports: [CommonModule, RouterModule, IndexerModule, ProtocolV001Module],
+      imports: [CommonModule, RouterModule, IndexerModule, ProtocolV001Module,OrdModule,XvmModule],
       providers: [
         RouterService,
         IndexerService,
@@ -23,6 +30,8 @@ describe('ProtocolService', () => {
 
     service = module.get<RouterService>(RouterService);
     indexService = module.get<IndexerService>(IndexerService);
+    ordService = module.get<OrdService>(OrdService)
+    xvmService = module.get<XvmService>(XvmService)
   });
 
   afterAll(async () => {
@@ -75,5 +84,12 @@ describe('ProtocolService', () => {
     const inscriptionContent = '0f0001DAAAAAAABgAIAAQABgAAAAQAAAABAAAADAAAAAgADAAIAAQACAAAAAgAAAAEAAAAxgAAADB4Zjg2MDgwODA4MDk0OTA0YjBlZDIzZWU1ZWUwMzg2ODBhMTI4YzBkMGQwMGYxNjE4YWNmMzgzMGY0MjQwODAxY2EwNWQwN2U0ODFlMzE3ZTdmNDA1YmUyYzQ4ZmM5NGQwMTFhMDBmM2ViMDBhNTIyZTE1MzQ3OTFhMjMwYzMxNjk0N2EwNjY3ZTVmZDBjNTNjNGMxYTc2M2UzZDMwYWYzODQ3YzQ3NTc5MTFiMWQ4YzE4MGQyMzU1Y2E2Nzc2MzJlMDI3YwAA'
     const command = service.from(inscriptionContent).decodeInscription(inscriptionContent)
     console.log(command)
+  })
+
+  it.only('',async()=>{
+    const inscribe = await ordService.getInscriptionByTxid('b468c63116eddc5f920958f2999581c932b01b697d03340b08f74611c6d4754e')
+    const command = service.from(inscribe.content).decodeInscription(inscribe.content) as CommandsV1Type[]
+    const unsign = xvmService.unSignTransaction(command[0].data)
+    console.log(unsign)
   })
 });

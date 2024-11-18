@@ -178,16 +178,7 @@ export class XvmService {
             return null
         }
         try {
-            const tx = ethers.Transaction.from(signTransaction)
-            if (!tx.from) {
-                this.logger.warn(`Invalid signature address`)
-                return null
-            }
-            if (!tx.to) {
-                this.logger.warn(`Invalid to address. toAddress: ${tx?.to} sender: ${tx.from}`)
-                return null
-            }
-            return tx
+            return ethers.Transaction.from(signTransaction)
         } catch (error) {
             const errMsg = `unsign transaction fail. \n${error instanceof Error ? error.stack : error}`
             this.logger.warn(errMsg)
