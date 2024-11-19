@@ -47,13 +47,7 @@ export class InscribeService {
     }
   }
 
-  async create(preBroadcastTx: PreBroadcastTx) {
-    const feeRate = await this.getFeeRate();
-
-    if (!feeRate) {
-      return;
-    }
-
+  async create(preBroadcastTx: PreBroadcastTx, feeRate: number) {
     const preBroadcastTxList = await this.preBroadcastTxItem.find({
       where: { preExecutionId: preBroadcastTx.id },
     });
@@ -104,16 +98,10 @@ export class InscribeService {
   }
 
   async transfer(preBroadcastTx: PreBroadcastTx) {
-    const feeRate = await this.getFeeRate();
-
-    if (!feeRate) {
-      return;
-    }
-
     const transferResult = await this.bTCTransaction.transfer(
       preBroadcastTx.temporaryAddress,
       preBroadcastTx.amount,
-      feeRate,
+      preBroadcastTx.feeRate,
       this.feeRate,
     );
 
@@ -140,17 +128,11 @@ export class InscribeService {
   }
 
   async commit(preBroadcastTx: PreBroadcastTx) {
-    const feeRate = await this.getFeeRate();
-
-    if (!feeRate) {
-      return;
-    }
-
     const revealResult = await createReveal(
       preBroadcastTx.privateKey,
       preBroadcastTx.content,
       preBroadcastTx.receiverAddress,
-      feeRate,
+      preBroadcastTx.feeRate,
       0,
       preBroadcastTx.commitTx,
     );
@@ -212,6 +194,12 @@ export class InscribeService {
   }
 
   async run() {
+    const feeRate = await this.getFeeRate();
+
+    if (!feeRate) {
+      return;
+    }
+
     const pendingTx = await this.preBroadcastTx.findOne({
       where: {
         status: 3,
@@ -246,7 +234,7 @@ export class InscribeService {
         });
 
         if (initialTx) {
-          await this.create(initialTx);
+          await this.create(initialTx, feeRate);
         }
       }
     }
