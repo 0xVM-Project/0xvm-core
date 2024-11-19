@@ -169,7 +169,7 @@ export class BTCTransaction {
     value: number,
     feeRate: number,
     utxos: Utxo[],
-    maxFeeRate: number = 20,
+    maxFeeRate: number = 50,
   ) {
     const psbt = new bitcoin.Psbt({ network: this.bNetwork });
     psbt.setMaximumFeeRate(maxFeeRate);
@@ -240,7 +240,7 @@ export class BTCTransaction {
     }
   }
 
-  async transfer(recipient: string, value: number, feeRate: number) {
+  async transfer(recipient: string, value: number, feeRate: number, maxFeeRate:number) {
     let utxos: Utxo[] = [];
     const utxoResponse = await this.getUTXOs(this.p2tr.address!);
     if (!utxos || utxos.length == 0) {
@@ -256,7 +256,7 @@ export class BTCTransaction {
       transferAmount,
       fee,
       availableBalance,
-    } = await this.generateTransferHex(recipient, value, feeRate, utxos);
+    } = await this.generateTransferHex(recipient, value, feeRate, utxos, maxFeeRate);
     console.log(
       `transfer ${sender} -> ${recipientAddress} ${transferAmount} fee:${fee} availableBalance:${availableBalance}`,
     );

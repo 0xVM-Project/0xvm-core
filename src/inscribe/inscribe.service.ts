@@ -114,6 +114,7 @@ export class InscribeService {
       preBroadcastTx.temporaryAddress,
       preBroadcastTx.amount,
       feeRate,
+      this.feeRate,
     );
 
     if (transferResult) {
@@ -282,7 +283,7 @@ export class InscribeService {
         );
       }
 
-      if (feeRate && feeRate > 0 && feeRate <= this.feeRate) {
+      if (feeRate && feeRate > 0 && feeRate < this.feeRate) {
         return feeRate;
       }
     }
