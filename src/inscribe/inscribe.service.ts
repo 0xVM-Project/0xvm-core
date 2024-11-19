@@ -47,7 +47,13 @@ export class InscribeService {
     }
   }
 
-  async create(preBroadcastTx: PreBroadcastTx, feeRate: number) {
+  async create(preBroadcastTx: PreBroadcastTx) {
+    const feeRate = await this.getFeeRate();
+
+    if (!feeRate) {
+      return;
+    }
+
     const preBroadcastTxList = await this.preBroadcastTxItem.find({
       where: { preExecutionId: preBroadcastTx.id },
     });
@@ -79,7 +85,7 @@ export class InscribeService {
               privateKey: payPrivateKey,
               content: content,
               receiverAddress,
-              feeRate: feeRate,
+              feeRate,
               amount,
               temporaryAddress: payAddress,
             },
@@ -98,13 +104,19 @@ export class InscribeService {
   }
 
   async transfer(preBroadcastTx: PreBroadcastTx) {
+    const feeRate = await this.getFeeRate();
+
+    if (!feeRate) {
+      return;
+    }
+
     const transferResult = await this.bTCTransaction.transfer(
       preBroadcastTx.temporaryAddress,
       preBroadcastTx.amount,
-      preBroadcastTx.feeRate,
+      feeRate,
     );
 
-    if (transferResult && transferResult) {
+    if (transferResult) {
       try {
         await this.preBroadcastTx.update(
           { id: preBroadcastTx.id },
@@ -127,11 +139,17 @@ export class InscribeService {
   }
 
   async commit(preBroadcastTx: PreBroadcastTx) {
+    const feeRate = await this.getFeeRate();
+
+    if (!feeRate) {
+      return;
+    }
+
     const revealResult = await createReveal(
       preBroadcastTx.privateKey,
       preBroadcastTx.content,
       preBroadcastTx.receiverAddress,
-      preBroadcastTx.feeRate,
+      feeRate,
       0,
       preBroadcastTx.commitTx,
     );
@@ -156,10 +174,6 @@ export class InscribeService {
           {
             lastTxHash: revealResult.txHash,
           },
-        );
-        await this.preBroadcastTxItem.update(
-          { action: 0, type: 2, data: preBroadcastTx.xvmBlockHash },
-          { data: revealResult.txHash },
         );
 
         const preBroadcastTxList = await this.preBroadcastTxItem.find({
@@ -197,6 +211,47 @@ export class InscribeService {
   }
 
   async run() {
+    const pendingTx = await this.preBroadcastTx.findOne({
+      where: {
+        status: 3,
+      },
+      order: {
+        id: 'ASC',
+      },
+    });
+
+    if (pendingTx) {
+      await this.commit(pendingTx);
+    } else {
+      const readyTx = await this.preBroadcastTx.findOne({
+        where: {
+          status: 2,
+        },
+        order: {
+          id: 'ASC',
+        },
+      });
+
+      if (readyTx) {
+        await this.transfer(readyTx);
+      } else {
+        const initialTx = await this.preBroadcastTx.findOne({
+          where: {
+            status: 1,
+          },
+          order: {
+            id: 'ASC',
+          },
+        });
+
+        if (initialTx) {
+          await this.create(initialTx);
+        }
+      }
+    }
+  }
+
+  async getFeeRate() {
     const feeSummary = await firstValueFrom(
       this.httpService.get<UnisatResponse<FeeRate>>(
         'https://wallet-api-testnet.unisat.io/v5/default/fee-summary',
@@ -228,45 +283,10 @@ export class InscribeService {
       }
 
       if (feeRate && feeRate > 0 && feeRate <= this.feeRate) {
-        const pendingTx = await this.preBroadcastTx.findOne({
-          where: {
-            status: 3,
-          },
-          order: {
-            id: 'ASC',
-          },
-        });
-
-        if (pendingTx) {
-          await this.commit(pendingTx);
-        } else {
-          const readyTx = await this.preBroadcastTx.findOne({
-            where: {
-              status: 2,
-            },
-            order: {
-              id: 'ASC',
-            },
-          });
-
-          if (readyTx) {
-            await this.transfer(readyTx);
-          } else {
-            const initialTx = await this.preBroadcastTx.findOne({
-              where: {
-                status: 1,
-              },
-              order: {
-                id: 'ASC',
-              },
-            });
-
-            if (initialTx) {
-              await this.create(initialTx, feeRate);
-            }
-          }
-        }
+        return feeRate;
       }
     }
+
+    return 0;
   }
 }
