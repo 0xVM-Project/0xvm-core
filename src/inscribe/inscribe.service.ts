@@ -94,6 +94,11 @@ export class InscribeService {
         });
         await this.transfer(newPreBroadcastTx);
       }
+    } else {
+      await this.preBroadcastTx.update(
+        { id: preBroadcastTx?.id },
+        { status: 0 },
+      );
     }
   }
 
@@ -133,7 +138,6 @@ export class InscribeService {
       preBroadcastTx.content,
       preBroadcastTx.receiverAddress,
       preBroadcastTx.feeRate,
-      0,
       preBroadcastTx.commitTx,
     );
 
@@ -267,7 +271,7 @@ export class InscribeService {
       if (Date.now() - this.lastFeeRateLog > 10 * 60 * 1000) {
         this.lastFeeRateLog = Date.now();
         this.logger.log(
-          `current feeRate: ${feeRate}, expected feeRate: ${this.feeRate}, ${feeRate <= this.feeRate ? '' : ' not eligible, skip'}`,
+          `current feeRate: ${feeRate}, expected feeRate: ${this.feeRate}${feeRate <= this.feeRate ? '' : ', not eligible, skip'}`,
         );
       }
 

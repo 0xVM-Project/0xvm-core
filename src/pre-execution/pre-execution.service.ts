@@ -237,7 +237,6 @@ export class PreExecutionService {
             );
 
             if (minterBlockHash) {
-              // const preBroadcastTxId = preBroadcastTx?.id??0;
               const toRewards = this.defaultConf.xvm.sysXvmAddress;
               const rewardHash = await this.xvmService
                 .rewardsTransfer(toRewards)

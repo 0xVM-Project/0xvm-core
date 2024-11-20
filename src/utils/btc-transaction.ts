@@ -1,4 +1,4 @@
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 import * as bitcoin from 'bitcoinjs-lib';
 import { Signer } from 'bitcoinjs-lib';
 import { ECPairAPI, ECPairFactory, ECPairInterface } from 'ecpair';
@@ -9,20 +9,24 @@ export type BTCNetwork = 'mainnet' | 'testnet';
 interface Utxo {
   txid: string;
   vout: number;
-  satoshis: number;
+  satoshi: number;
+  scriptType: number;
   scriptPk?: string;
-  addressType?: number;
-  inscriptions?: any[];
-  atomicals?: any[];
-  runes?: any[];
-  pubkey?: string;
+  codeType: number;
+  address: string;
   height?: number;
+  idx: number;
+  isOpInRBF: boolean;
+  isSpent: boolean;
+  inscriptions?: any[];
 }
 
 interface UTXOResponse {
   code: number;
   msg: string;
-  data: Array<Utxo>;
+  data: {
+    utxo: Array<Utxo>;
+  };
 }
 
 export class BTCTransaction {
@@ -35,8 +39,8 @@ export class BTCTransaction {
   private readonly network: BTCNetwork;
 
   private readonly unisatBaseUrl = {
-    testnet: 'https://wallet-api-testnet.unisat.io/v5',
-    mainnet: 'https://wallet-api.unisat.io/v5',
+    testnet: 'https://open-api-testnet.unisat.io/v1',
+    mainnet: 'https://open-api.unisat.io/v1',
   };
 
   constructor(hexPrivateKey: string, network: BTCNetwork = 'testnet') {
@@ -68,6 +72,7 @@ export class BTCTransaction {
     const psbt = new bitcoin.Psbt({ network: this.bNetwork });
     // dummy value
     const dummyInputValue = 100000;
+    const xOnlyPubkey = keyPair.publicKey.subarray(1);
     // Add dummy inputs and outputs
     for (let i = 0; i < inputCount; i++) {
       psbt.addInput({
@@ -78,12 +83,13 @@ export class BTCTransaction {
         ).toString(16), // dummy txid
         index: i,
         witnessUtxo: {
-          script: bitcoin.payments.p2wpkh({
-            pubkey: keyPair.publicKey,
+          script: bitcoin.payments.p2tr({
+            pubkey: xOnlyPubkey,
             network: this.bNetwork,
           }).output!,
           value: dummyInputValue,
         },
+        tapInternalKey: xOnlyPubkey,
       });
     }
     const dummyFee = 10;
@@ -92,8 +98,8 @@ export class BTCTransaction {
     for (let i = 0; i < outputCount; i++) {
       const dummyOutputValue = i == outputCount - 1 ? lastValue : avgValue;
       psbt.addOutput({
-        address: bitcoin.payments.p2wpkh({
-          pubkey: keyPair.publicKey,
+        address: bitcoin.payments.p2tr({
+          pubkey: xOnlyPubkey,
           network: this.bNetwork,
         }).address!,
         value: dummyOutputValue - dummyFee, // dummy value
@@ -102,23 +108,8 @@ export class BTCTransaction {
     psbt.signAllInputs(keyPair);
     psbt.finalizeAllInputs();
     const virtualSize = psbt.extractTransaction().virtualSize();
-    return virtualSize * feeRate;
-  }
-
-  async broadcastTransaction(txHex: string) {
-    const url = `https://mempool.space${this.network == 'testnet' ? '/testnet' : ''}/api/tx`;
-    try {
-      const response = await axios.post(url, txHex, {
-        headers: { 'Content-Type': 'text/plain' },
-      });
-      return response.data;
-    } catch (error) {
-      console.error(
-        'Error broadcasting transaction:',
-        error instanceof AxiosError ? error.response?.data : error,
-      );
-      throw error;
-    }
+    const fee = virtualSize * feeRate;
+    return fee;
   }
 
   tapTweakHash(pubKey: Buffer, h: Buffer | undefined): Buffer {
@@ -181,18 +172,18 @@ export class BTCTransaction {
       throw new Error(`No UTXOs found for address.`);
     }
     const satoshisTotal = utxos
-      .map((d) => d.satoshis)
+      .map((d) => d.satoshi)
       .reduce((prev, current) => prev + current);
-    console.log(
-      `${sender} utxo amount: ${utxos.length} total: ${satoshisTotal} sats`,
-    );
+    // console.log(
+    //   `${sender} utxo amount: ${utxos.length} total: ${satoshisTotal} sats`,
+    // );
     utxos.forEach((utxo) => {
       psbt.addInput({
         hash: utxo.txid,
         index: utxo.vout,
         witnessUtxo: {
           script: this.p2tr.output!,
-          value: utxo.satoshis,
+          value: utxo.satoshi,
         },
         tapInternalKey: this.internalPubkey,
       });
@@ -240,39 +231,36 @@ export class BTCTransaction {
     }
   }
 
-  async transfer(recipient: string, value: number, feeRate: number, maxFeeRate:number) {
-    let utxos: Utxo[] = [];
+  async transfer(
+    recipient: string,
+    value: number,
+    feeRate: number,
+    maxFeeRate: number,
+  ) {
     const utxoResponse = await this.getUTXOs(this.p2tr.address!);
-    if (!utxos || utxos.length == 0) {
-      utxos = utxoResponse.data;
-    }
+    const utxos = utxoResponse?.data?.utxo;
     if (!utxos || utxos.length === 0) {
-      throw new Error(`No UTXOs found for address.`);
+      console.warn('No available UTXOs found for address.');
+      return '';
     }
-    const {
-      sender,
-      txHex,
-      recipientAddress,
-      transferAmount,
-      fee,
-      availableBalance,
-    } = await this.generateTransferHex(recipient, value, feeRate, utxos, maxFeeRate);
-    console.log(
-      `transfer ${sender} -> ${recipientAddress} ${transferAmount} fee:${fee} availableBalance:${availableBalance}`,
+    const { txHex } = await this.generateTransferHex(
+      recipient,
+      value,
+      feeRate,
+      utxos,
+      maxFeeRate,
     );
-    // let hash = '';
-    // hash = await this.broadcastTransaction(txHex);
-    // const availableUTXO: Utxo = {
-    //   txid: txHex,
-    //   vout: 1,
-    //   satoshis: availableBalance,
-    // };
     return txHex;
   }
 
   async getUTXOs(address: string): Promise<UTXOResponse> {
-    const url = this.unisatBaseUrl[this.network] + '/address/btc-utxo';
-    const response = await axios.get(url, { params: { address: address } });
-    return response.data;
+    const url = `${this.unisatBaseUrl[this.network]}/indexer/address/${address}/utxo-data?cursor=0&size=500&confirmed=true`;
+    const response = await axios.get(url, {
+      headers: {
+        accept: 'application/json',
+        Authorization: `Bearer ${process.env.UNISAT_API_KEY || ''}`,
+      },
+    });
+    return response?.data;
   }
 }

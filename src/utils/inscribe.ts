@@ -4,10 +4,10 @@ import {
   Ordit,
   UTXOLimited,
 } from '@sadoprotocol/ordit-sdk';
+import axios from 'axios';
 import { address as BtcAddress, Transaction, address } from 'bitcoinjs-lib';
 import { bitcoin, regtest, testnet } from 'bitcoinjs-lib/src/networks';
 import ECPairFactory from 'ecpair';
-import { firstValueFrom } from 'rxjs';
 import * as ecc from 'tiny-secp256k1';
 
 export const POSTAGE = 1000; // base value of the inscription in sats
@@ -26,7 +26,6 @@ export async function createCommit(
   content: string,
   receiverAddress: string,
   feeRate: number,
-  depositAmount: number = 0,
 ) {
   const factory = ECPairFactory(ecc);
 
@@ -56,7 +55,7 @@ export async function createCommit(
   return {
     payPrivateKey: payPrivateKey.toString('hex'),
     payAddress: address,
-    amount: revealFee + (depositAmount > 0 ? depositAmount + 43 * feeRate : 0),
+    amount: revealFee,
   };
 }
 
@@ -65,7 +64,6 @@ export async function createReveal(
   content: string,
   receiverAddress: string,
   feeRate: number,
-  depositAmount: number,
   commitHex: string,
 ) {
   const wallet = new Ordit({
@@ -90,7 +88,7 @@ export async function createReveal(
 
   await checkCommitTx(
     commitHex,
-    revealFee + (depositAmount > 0 ? depositAmount + 43 * feeRate : 0),
+    revealFee,
     address,
   );
 
@@ -122,15 +120,7 @@ export async function createReveal(
     await inscriber.build();
 
     // add another output if depositAmount is greater than 0.
-    const commitHex = depositAmount
-      ? inscriber
-          .toPSBT()
-          .addOutput({
-            address: receiverAddress,
-            value: depositAmount,
-          })
-          .toHex()
-      : inscriber.toHex();
+    const commitHex = inscriber.toHex();
 
     const signedTxHex = wallet.signPsbt(commitHex, {
       isRevealTx: true,
@@ -149,16 +139,26 @@ export async function createReveal(
 }
 
 export async function relay(...txs: string[]) {
-  const dataSource = new JsonRpcDatasource({ network: BTC_NETWORK });
-
   for (const tx of txs) {
     console.log(
       `relay is called tx = ${tx}, txId = ${Transaction.fromHex(tx).getId()}`,
     );
-    await dataSource.relay({ hex: tx, validate: false });
+    await postTx(tx);
   }
 
   return true;
+}
+
+async function postTx(rawtx: string): Promise<string> {
+  try {
+      const response = await axios.post(`https://wallet-api-testnet.unisat.io/v5/tx/broadcast`, { rawtx })
+      if (response.data.code == 0) {
+          return response.data.data
+      }
+      throw new Error(response.data.msg)
+  } catch(error) {
+      throw new Error(error)
+  }
 }
 
 function createProxyRpc({
@@ -173,7 +173,7 @@ function createProxyRpc({
   const proxy = new Proxy(original, {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     get(target, p, receiver) {
-      console.log(`proxy get is called:  ${p.toString()}`);
+      // console.log(`proxy get is called:  ${p.toString()}`);
       if (p === 'getSpendables') {
         return () => getSpendables(commitHex, revealAddress);
       }
@@ -216,7 +216,7 @@ function getSpendables(
 }
 
 async function checkCommitTx(tx: string, amount: number, payAddress: string) {
-  console.debug(`tx: ${tx} amount: ${amount} payAddress: ${payAddress}`)
+  // console.debug(`tx: ${tx} amount: ${amount} payAddress: ${payAddress}`)
   const validTx = Transaction.fromHex(tx).outs.find((out) => {
     return (
       out.value === amount &&
