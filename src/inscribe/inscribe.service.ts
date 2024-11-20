@@ -253,10 +253,13 @@ export class InscribeService {
           });
 
           if (!completedTx) {
-            return true;
+            await this.create(initialTx, feeRate);
           } else if (completedTx && completedTx?.revealHash) {
             const isChunked = await checkIsChunked(completedTx?.revealHash);
-            return isChunked;
+
+            if (isChunked) {
+              await this.create(initialTx, feeRate);
+            }
           }
         }
       }
