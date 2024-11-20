@@ -86,11 +86,7 @@ export async function createReveal(
 
   const { address, revealFee } = await inscriber.generateCommit();
 
-  await checkCommitTx(
-    commitHex,
-    revealFee,
-    address,
-  );
+  await checkCommitTx(commitHex, revealFee, address);
 
   // To implement the deposit by making use of change address.
   inscriber = new Inscriber({
@@ -140,9 +136,9 @@ export async function createReveal(
 
 export async function relay(...txs: string[]) {
   for (const tx of txs) {
-    console.log(
-      `relay is called tx = ${tx}, txId = ${Transaction.fromHex(tx).getId()}`,
-    );
+    // console.log(
+    //   `relay is called tx = ${tx}, txId = ${Transaction.fromHex(tx).getId()}`,
+    // );
     await postTx(tx);
   }
 
@@ -151,13 +147,16 @@ export async function relay(...txs: string[]) {
 
 async function postTx(rawtx: string): Promise<string> {
   try {
-      const response = await axios.post(`https://wallet-api-testnet.unisat.io/v5/tx/broadcast`, { rawtx })
-      if (response.data.code == 0) {
-          return response.data.data
-      }
-      throw new Error(response.data.msg)
-  } catch(error) {
-      throw new Error(error)
+    const response = await axios.post(
+      `https://wallet-api-testnet.unisat.io/v5/tx/broadcast`,
+      { rawtx },
+    );
+    if (response.data.code == 0) {
+      return response.data.data;
+    }
+    throw new Error(response.data.msg);
+  } catch (error) {
+    throw new Error(error);
   }
 }
 
@@ -209,7 +208,7 @@ function getSpendables(
         hex: out.script.toString('hex'),
         type: 'witness_v1_taproot',
       },
-      confirmation:0
+      confirmation: 0,
     },
   ];
   return Promise.resolve(result);
@@ -227,4 +226,28 @@ async function checkCommitTx(tx: string, amount: number, payAddress: string) {
   if (!validTx) {
     throw new Error('Commit inscribe param error, invalid tx');
   }
+}
+
+export async function checkIsChunked(hash?: string) {
+  if (hash) {
+    const url = `https://open-api-testnet.unisat.io/v1/indexer/tx/${hash}`;
+
+    const response: { data: { data: { confirmations: number } } } =
+      await axios.get(url, {
+        headers: {
+          accept: 'application/json',
+          Authorization: `Bearer ${process.env.UNISAT_API_KEY || ''}`,
+        },
+      });
+
+    return Boolean(
+      response &&
+        response?.data &&
+        response?.data?.data &&
+        response?.data?.data?.confirmations &&
+        response?.data?.data?.confirmations > 0,
+    );
+  }
+
+  return false;
 }

@@ -11,7 +11,12 @@ import { PreBroadcastTxItem } from 'src/entities/pre-broadcast-tx-item.entity';
 import { PreBroadcastTx } from 'src/entities/pre-broadcast-tx.entity';
 import { RouterService } from 'src/router/router.service';
 import { BTCTransaction } from 'src/utils/btc-transaction';
-import { createCommit, createReveal, relay } from 'src/utils/inscribe';
+import {
+  checkIsChunked,
+  createCommit,
+  createReveal,
+  relay,
+} from 'src/utils/inscribe';
 import { In, Repository } from 'typeorm';
 import { FeeRate, UnisatResponse } from './inscribe.interface';
 
@@ -238,7 +243,21 @@ export class InscribeService {
         });
 
         if (initialTx) {
-          await this.create(initialTx, feeRate);
+          const completedTx = await this.preBroadcastTx.findOne({
+            where: {
+              status: 4,
+            },
+            order: {
+              id: 'DESC',
+            },
+          });
+
+          if (!completedTx) {
+            return true;
+          } else if (completedTx && completedTx?.revealHash) {
+            const isChunked = await checkIsChunked(completedTx?.revealHash);
+            return isChunked;
+          }
         }
       }
     }
