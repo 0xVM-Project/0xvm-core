@@ -218,6 +218,7 @@ export class CoreService {
             if(btcLatestBlockNumber){
                 // when online btc block height bigger than last btc block height
                 if(btcLatestBlockNumber > lastBtcBlockHeight){
+                    this.logger.debug("normal")
                     let retryTotal = 0
 
                     while (true) {
@@ -243,6 +244,7 @@ export class CoreService {
                         }
                     }
                 }else{
+                    this.logger.debug("pre")
                     let retryTotal = 0
 
                     while (true) {
@@ -343,6 +345,7 @@ export class CoreService {
 
         do {
             isPendingTxExists = await this.pendingTx.exists({where:{status:2}});
+            this.logger.debug(`isPendingTxExists: ${isPendingTxExists}`)
 
             if(!isPendingTxExists){
                 break;

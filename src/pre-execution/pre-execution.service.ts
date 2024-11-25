@@ -172,14 +172,17 @@ export class PreExecutionService {
   }
 
   async chunk(isEnforce?: boolean) {
+    this.logger.debug(`isEnforce: ${isEnforce}`)
     // get latest xvm block height
     const xvmLatestBlockNumber = await this.xvmService.getLatestBlockNumber();
+    this.logger.debug(`xvmLatestBlockNumber: ${xvmLatestBlockNumber}`)
 
     if (!isNaN(xvmLatestBlockNumber)) {
       const xvmCurrentBlockNumber = xvmLatestBlockNumber + 1;
       const preTransactionList = await this.pendingTx.find({
         where: { status: 2 },
       });
+      this.logger.debug(`preTransactionList: ${JSON.stringify(preTransactionList)}`)
 
       if (preTransactionList && preTransactionList?.length > 0) {
         let availablePreTransactionList: PendingTx[] = [];
@@ -205,6 +208,9 @@ export class PreExecutionService {
             }
           }
         }
+        this.logger.debug(`isInscriptionEnd: ${isInscriptionEnd}`)
+        this.logger.debug(`decodeInscriptionString: ${decodeInscriptionString}`)
+        this.logger.debug(`availablePreTransactionList: ${JSON.stringify(availablePreTransactionList)}`)
 
         if (isEnforce) {
           isInscriptionEnd = true;
@@ -225,12 +231,14 @@ export class PreExecutionService {
                 type: 2,
               },
             });
+            this.logger.debug(`availablePreTransactionItems: ${availablePreTransactionItems}`)
 
           if (
             availablePreTransactionItems &&
             availablePreTransactionItems?.length > 0
           ) {
             const toRewards = this.defaultConf.xvm.sysXvmAddress;
+            this.logger.debug(`toRewards: ${toRewards}`)
             const rewardHash = await this.xvmService
               .rewardsTransfer(toRewards)
               .catch((error) => {
@@ -238,6 +246,7 @@ export class PreExecutionService {
                   `inscription rewards fail. sysAddress: ${this.xvmService.sysAddress} to: ${toRewards} \n ${error?.stack}`,
                 );
               });
+              this.logger.debug(`rewardHash: ${rewardHash}`)
 
             if (rewardHash) {
               await this.hashMappingService.bindHash({
@@ -256,6 +265,7 @@ export class PreExecutionService {
               const minterBlockHash = await protocol.mineBlock(
                 `0x${xvmCurrentBlockNumber.toString(16).padStart(10, '0')}${Math.floor(Date.now() / 1000).toString(16)}`,
               );
+              this.logger.debug(`minterBlockHash: ${minterBlockHash}`)
 
               if (minterBlockHash) {
                 const lastConfig = await this.lastConfig.find({
@@ -264,6 +274,7 @@ export class PreExecutionService {
                     id: 'ASC',
                   },
                 });
+                this.logger.debug(`lastConfig: ${JSON.stringify(lastConfig)}`)
 
                 if (lastConfig && lastConfig?.length > 0) {
                   const lastTxHash = lastConfig?.[0]?.lastTxHash ?? '';
@@ -278,6 +289,7 @@ export class PreExecutionService {
                         previous: lastTxHash ?? '',
                       }),
                     );
+                    this.logger.debug(`preBroadcastTx: ${JSON.stringify(preBroadcastTx)}`)
                     await this.preBroadcastTxItem.update(
                       {
                         id: In(
