@@ -230,34 +230,34 @@ export class PreExecutionService {
             availablePreTransactionItems &&
             availablePreTransactionItems?.length > 0
           ) {
-            const protocol: IProtocol<any, any> =
-              this.routerService.from('0f0001');
-            const minterBlockHash = await protocol.mineBlock(
-              `0x${xvmCurrentBlockNumber.toString(16).padStart(10, '0')}${Math.floor(Date.now() / 1000).toString(16)}`,
-            );
-
-            if (minterBlockHash) {
-              const toRewards = this.defaultConf.xvm.sysXvmAddress;
-              const rewardHash = await this.xvmService
-                .rewardsTransfer(toRewards)
-                .catch((error) => {
-                  throw new Error(
-                    `inscription rewards fail. sysAddress: ${this.xvmService.sysAddress} to: ${toRewards} \n ${error?.stack}`,
-                  );
-                });
-
-              if (rewardHash) {
-                await this.hashMappingService.bindHash({
-                  xFromAddress: toRewards,
-                  xToAddress: toRewards,
-                  btcHash: `0x${xvmCurrentBlockNumber.toString().padStart(64, '0')}`,
-                  xvmHash: rewardHash,
-                  logIndex: availablePreTransactionItems?.length,
-                });
-                this.logger.log(
-                  `[${xvmCurrentBlockNumber}] Send Inscription Rewards[546*(10^8)] success, hash: ${rewardHash}`,
+            const toRewards = this.defaultConf.xvm.sysXvmAddress;
+            const rewardHash = await this.xvmService
+              .rewardsTransfer(toRewards)
+              .catch((error) => {
+                throw new Error(
+                  `inscription rewards fail. sysAddress: ${this.xvmService.sysAddress} to: ${toRewards} \n ${error?.stack}`,
                 );
+              });
 
+            if (rewardHash) {
+              await this.hashMappingService.bindHash({
+                xFromAddress: toRewards,
+                xToAddress: toRewards,
+                btcHash: `0x${xvmCurrentBlockNumber.toString().padStart(64, '0')}`,
+                xvmHash: rewardHash,
+                logIndex: availablePreTransactionItems?.length,
+              });
+              this.logger.log(
+                `[${xvmCurrentBlockNumber}] Send Inscription Rewards[546*(10^8)] success, hash: ${rewardHash}`,
+              );
+
+              const protocol: IProtocol<any, any> =
+                this.routerService.from('0f0001');
+              const minterBlockHash = await protocol.mineBlock(
+                `0x${xvmCurrentBlockNumber.toString(16).padStart(10, '0')}${Math.floor(Date.now() / 1000).toString(16)}`,
+              );
+
+              if (minterBlockHash) {
                 const lastConfig = await this.lastConfig.find({
                   take: 1,
                   order: {
