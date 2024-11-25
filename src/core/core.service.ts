@@ -92,6 +92,7 @@ export class CoreService {
                 if (!latestHistoryTx) {
                     throw new Error(`The {{btcHistoryTxRepository}} table data is abnormal and the data is empty`)
                 }
+                break
                 if (latestBlockTimestampBy0xvm <= latestHistoryTx.blockTimestamp) {
                     break
                 } else {
