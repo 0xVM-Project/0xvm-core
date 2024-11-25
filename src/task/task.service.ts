@@ -45,6 +45,7 @@ export class TaskService {
     try {
       if (!this.isInscribeRunning) {
         this.isInscribeRunning = true;
+        await this.coreService.prePackage();
         await this.inscribeService.run();
         this.isInscribeRunning = false;
       }

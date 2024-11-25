@@ -69,13 +69,19 @@ export class PreExecutionService {
             action: InscriptionActionEnum.prev,
             data: '0x0000000000000000000000000000000000000000000000000000000000000000',
           };
+          const actionMineBlock = {
+            action: InscriptionActionEnum.mineBlock,
+            data: '0x0000000000000000000000000000000000000000000000000000000000000000',
+          };
           const content = protocol.encodeInscription(
-            [actionPre].concat(
-              decodeInscriptionList.reduce(
-                (acc, cur) => acc.concat(cur?.data),
-                [],
-              ),
-            ),
+            [actionPre]
+              .concat(
+                decodeInscriptionList.reduce(
+                  (acc, cur) => acc.concat(cur?.data),
+                  [],
+                ),
+              )
+              .concat([actionMineBlock]),
           );
 
           if (content) {
@@ -112,6 +118,17 @@ export class PreExecutionService {
                 preBroadcastTxItemList &&
                 preBroadcastTxItemList?.length > 0
               ) {
+                preBroadcastTxItemList?.unshift({
+                  id: preBroadcastTxItemList?.[0]?.id,
+                  data: actionPre,
+                });
+                preBroadcastTxItemList?.push({
+                  id: preBroadcastTxItemList?.[
+                    preBroadcastTxItemList?.length - 1
+                  ]?.id,
+                  data: actionMineBlock,
+                });
+
                 try {
                   // save executed transaction items
                   await this.preBroadcastTxItem.save(
@@ -171,7 +188,7 @@ export class PreExecutionService {
     }
   }
 
-  async chunk(isEnforce?: boolean) {
+  async chunk() {
     // get latest xvm block height
     const xvmLatestBlockNumber = await this.xvmService.getLatestBlockNumber();
 
@@ -182,136 +199,156 @@ export class PreExecutionService {
       });
 
       if (preTransactionList && preTransactionList?.length > 0) {
-        let availablePreTransactionList: PendingTx[] = [];
-        let decodeInscriptionString = '';
-        let isInscriptionEnd = false;
+        const toRewards = this.defaultConf.xvm.sysXvmAddress;
+        const rewardHash = await this.xvmService
+          .rewardsTransfer(toRewards)
+          .catch((error) => {
+            throw new Error(
+              `inscription rewards fail. sysAddress: ${this.xvmService.sysAddress} to: ${toRewards} \n ${error?.stack}`,
+            );
+          });
 
-        for (const preTransaction of preTransactionList) {
-          const content = preTransaction?.content ?? '';
+        if (rewardHash) {
+          await this.hashMappingService.bindHash({
+            xFromAddress: toRewards,
+            xToAddress: toRewards,
+            btcHash: `0x${xvmCurrentBlockNumber.toString().padStart(64, '0')}`,
+            xvmHash: rewardHash,
+            logIndex: preTransactionList?.length,
+          });
+          this.logger.log(
+            `[${xvmCurrentBlockNumber}] Send Inscription Rewards[546*(10^8)] success, hash: ${rewardHash}`,
+          );
 
-          if (
-            content &&
-            decodeInscriptionString.length < this.maxInscriptionSize
-          ) {
-            // when the length of all unpacked transactions does not exceed the upper limit
-            decodeInscriptionString += content;
-            availablePreTransactionList.push(preTransaction);
+          const protocol: IProtocol<any, any> =
+            this.routerService.from('0f0001');
+          const minterBlockHash = await protocol.mineBlock(
+            `0x${xvmCurrentBlockNumber.toString(16).padStart(10, '0')}${Math.floor(Date.now() / 1000).toString(16)}`,
+          );
 
-            if (decodeInscriptionString.length >= this.maxInscriptionSize) {
-              // if the limit is exceeded by adding the next one, set the current transaction to the should-pack status
-              // the actual execution here will exceed the size of the upper limit of one transaction length, but it doesn't matter.
-              isInscriptionEnd = true;
-              break;
+          if (minterBlockHash) {
+            try {
+              await this.pendingTx.update(
+                {
+                  id: In(
+                    preTransactionList?.map(
+                      (_preTransactionItem) => _preTransactionItem?.id,
+                    ),
+                  ),
+                },
+                {
+                  status: 4,
+                },
+              );
+
+              await this.preBroadcastTxItem.update(
+                {
+                  pendingTxId: In(
+                    preTransactionList?.map(
+                      (_preTransactionItem) => _preTransactionItem?.id,
+                    ),
+                  ),
+                  type: 2,
+                  action: 6,
+                },
+                {
+                  data: `0x${xvmCurrentBlockNumber.toString(16).padStart(10, '0')}${Math.floor(Date.now() / 1000).toString(16)}`,
+                },
+              );
+            } catch (error) {
+              this.logger.error('update chunk data failed');
+              throw error;
             }
           }
         }
+      }
+    }
+  }
 
-        if (isEnforce) {
-          isInscriptionEnd = true;
-        }
+  async package(isEnforce?: boolean) {
+    const preTransactionItemList = await this.preBroadcastTxItem.find({
+      where: { preExecutionId: 0, type: 2 },
+    });
 
-        if (
-          decodeInscriptionString &&
-          availablePreTransactionList &&
-          availablePreTransactionList?.length > 0 &&
-          isInscriptionEnd
-        ) {
-          const availablePreTransactionItems =
-            await this.preBroadcastTxItem.find({
-              where: {
-                pendingTxId: In(
-                  availablePreTransactionList?.map((_item) => _item?.id),
-                ),
-                type: 2,
-              },
+    if (preTransactionItemList && preTransactionItemList?.length > 0) {
+      const pendingTransactionList = await this.pendingTx.find({
+        where: {
+          status: 4,
+          id: In(
+            preTransactionItemList?.map(
+              (_preTransactionItem) => _preTransactionItem?.pendingTxId,
+            ),
+          ),
+        },
+      });
+
+      if (pendingTransactionList && pendingTransactionList?.length > 0) {
+        let list = preTransactionItemList?.filter((_item) =>
+          pendingTransactionList
+            ?.map((_i) => _i.id)
+            .includes(_item?.pendingTxId),
+        );
+
+        while (list && list?.length > 0) {
+          let availableString = '';
+          let availableList = [];
+          let availableIdList = [];
+          let enablePackage = false;
+          const protocol: IProtocol<any, any> =
+            this.routerService.from('0f0001');
+
+          for (const item of list) {
+            availableList.push({
+              action: item?.action,
+              data: item?.data,
             });
+            availableIdList.push(item?.id);
+            const content = protocol.encodeInscription(availableList);
 
-          if (
-            availablePreTransactionItems &&
-            availablePreTransactionItems?.length > 0
-          ) {
-            const toRewards = this.defaultConf.xvm.sysXvmAddress;
-            const rewardHash = await this.xvmService
-              .rewardsTransfer(toRewards)
-              .catch((error) => {
-                throw new Error(
-                  `inscription rewards fail. sysAddress: ${this.xvmService.sysAddress} to: ${toRewards} \n ${error?.stack}`,
-                );
-              });
+            if (content && availableString.length < this.maxInscriptionSize) {
+              // when the length of all unpacked transactions does not exceed the upper limit
+              availableString += content;
 
-            if (rewardHash) {
-              await this.hashMappingService.bindHash({
-                xFromAddress: toRewards,
-                xToAddress: toRewards,
-                btcHash: `0x${xvmCurrentBlockNumber.toString().padStart(64, '0')}`,
-                xvmHash: rewardHash,
-                logIndex: availablePreTransactionItems?.length,
-              });
-              this.logger.log(
-                `[${xvmCurrentBlockNumber}] Send Inscription Rewards[546*(10^8)] success, hash: ${rewardHash}`,
-              );
-
-              const protocol: IProtocol<any, any> =
-                this.routerService.from('0f0001');
-              const minterBlockHash = await protocol.mineBlock(
-                `0x${xvmCurrentBlockNumber.toString(16).padStart(10, '0')}${Math.floor(Date.now() / 1000).toString(16)}`,
-              );
-
-              if (minterBlockHash) {
-                const lastConfig = await this.lastConfig.find({
-                  take: 1,
-                  order: {
-                    id: 'ASC',
-                  },
-                });
-
-                if (lastConfig && lastConfig?.length > 0) {
-                  const lastTxHash = lastConfig?.[0]?.lastTxHash ?? '';
-
-                  try {
-                    const preBroadcastTx = await this.preBroadcastTx.save(
-                      this.preBroadcastTx.create({
-                        content: '',
-                        commitTx: '',
-                        status: 1,
-                        xvmBlockHash: rewardHash,
-                        previous: lastTxHash ?? '',
-                      }),
-                    );
-                    await this.preBroadcastTxItem.update(
-                      {
-                        id: In(
-                          availablePreTransactionItems?.map(
-                            (_item) => _item?.id,
-                          ),
-                        ),
-                        type: 2,
-                      },
-                      { preExecutionId: preBroadcastTx?.id },
-                    );
-                    await this.lastConfig.update(
-                      {},
-                      { lastTxHash: rewardHash },
-                    );
-                    await this.pendingTx.update(
-                      {
-                        id: In(
-                          availablePreTransactionList?.map(
-                            (_preTransactionItem) => _preTransactionItem?.id,
-                          ),
-                        ),
-                      },
-                      {
-                        status: 4,
-                      },
-                    );
-                  } catch (error) {
-                    this.logger.error('update preBroadcastTx failed');
-                    throw error;
-                  }
-                }
+              if (availableString.length >= this.maxInscriptionSize) {
+                // if the limit is exceeded by adding the next one, set the current transaction to the should-pack status
+                // the actual execution here will exceed the size of the upper limit of one transaction length, but it doesn't matter.
+                enablePackage = true;
+                break;
               }
             }
+          }
+
+          if (isEnforce) {
+            enablePackage = true;
+          }
+
+          if (availableString && availableList && availableList?.length > 0) {
+            if (enablePackage) {
+              try {
+                const preBroadcastTx = await this.preBroadcastTx.save(
+                  this.preBroadcastTx.create({
+                    content: '',
+                    commitTx: '',
+                    status: 1,
+                  }),
+                );
+
+                if (preBroadcastTx) {
+                  await this.preBroadcastTxItem.update(
+                    {
+                      id: In(availableIdList),
+                      type: 2,
+                    },
+                    { preExecutionId: preBroadcastTx?.id },
+                  );
+                }
+              } catch (error) {
+                this.logger.error('update package data failed');
+                throw error;
+              }
+            }
+
+            list = list.filter((_item) => !availableIdList?.includes(_item.id));
           }
         }
       }

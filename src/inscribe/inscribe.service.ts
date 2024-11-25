@@ -155,11 +155,8 @@ export class InscribeService {
           {
             revealHash: revealResult.txHash,
             status: 4,
+            previous: revealResult.txHash,
           },
-        );
-        await this.preBroadcastTx.update(
-          { previous: preBroadcastTx.xvmBlockHash },
-          { previous: revealResult.txHash },
         );
         this.lastConfig.update(
           {},

@@ -228,10 +228,10 @@ export class CoreService {
                                 this.isExecutionTaskStop = true;
                                 break
                             }else{
-                                await this.preChunk(true);
+                                await this.prePackage(true)
                                 await this.normalExecution(btcLatestBlockNumber, lastBtcBlockHeight + 1);
                                 // save lastBtcBlockHeight when completed
-                                await this.lastConfig.update({},{lastBtcBlockHeight:lastBtcBlockHeight+1})
+                                await this.lastConfig.update({},{lastBtcBlockHeight:lastBtcBlockHeight+1});
                                 this.isExecutionRunning = false;
                                 break
                             }
@@ -253,7 +253,7 @@ export class CoreService {
                                 this.isExecutionTaskStop = true;
                                 break
                             }else{
-                                await this.preChunk();
+                                await this.preExecutionService.chunk();
                                 this.isExecutionRunning = false;
                                 break
                             }
@@ -326,36 +326,20 @@ export class CoreService {
     
     async preExecution() {
         try {
-            this.isExecutionRunning = true;
-            await this.preExecutionService.execute();
-            this.isExecutionRunning = false;
-            return true;
+            if (!this.isExecutionTaskStop) {
+                this.isExecutionRunning = true;
+                await this.preExecutionService.execute();
+                this.isExecutionRunning = false;
+                return true;
+            }
         } catch (error) {
             this.isExecutionRunning = false;
-            this.logger.error("preExecution failed")
+            this.logger.error(`preExecution failed: ${JSON.stringify(error)}`)
             return false;
         }
     }
 
-    async preChunk(isEnforce?: boolean) {
-        let maxRetryCount = 50;
-        let isPendingTxExists = false;
-
-        do {
-            isPendingTxExists = await this.pendingTx.exists({where:{status:2}});
-
-            if(!isPendingTxExists){
-                break;
-            }
-
-            await this.preExecutionService.chunk(isEnforce);
-            
-            if(!isEnforce) {
-                break;
-            }
-
-            maxRetryCount--;
-            sleep(1000);
-        } while (isPendingTxExists || maxRetryCount > 0);
+    async prePackage(isEnforce?:boolean) {
+        await this.preExecutionService.package(isEnforce);
     }
 }
