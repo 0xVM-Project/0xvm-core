@@ -191,7 +191,7 @@ export class PreExecutionService {
     }
   }
 
-  async chunk() {
+  async chunk(currentBtcBlockHeight:number) {
     // get latest xvm block height
     const xvmLatestBlockNumber = await this.xvmService.getLatestBlockNumber();
 
@@ -261,7 +261,7 @@ export class PreExecutionService {
 
               await this.lastConfig.update(
                 {},
-                { lastBtcBlockHeight: xvmCurrentBlockNumber },
+                { lastBtcBlockHeight: currentBtcBlockHeight },
               );
             } catch (error) {
               this.logger.error('update chunk data failed');

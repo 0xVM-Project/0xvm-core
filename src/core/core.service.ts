@@ -242,6 +242,7 @@ export class CoreService {
              
             // get latest online btc block height
             const btcLatestBlockNumber = await this.indexerService.getLatestBlockNumberForBtc();
+            const currentBtcBlockHeight = lastBtcBlockHeight+1;
 
             if(btcLatestBlockNumber){
                 // when online btc block height bigger than last btc block height
@@ -256,9 +257,9 @@ export class CoreService {
                                 break
                             }else{
                                 await this.prePackage(true)
-                                await this.normalExecution(btcLatestBlockNumber, lastBtcBlockHeight + 1);
+                                await this.normalExecution(btcLatestBlockNumber, currentBtcBlockHeight);
                                 // save lastBtcBlockHeight when completed
-                                await this.lastConfig.update({},{lastBtcBlockHeight:lastBtcBlockHeight+1});
+                                await this.lastConfig.update({},{lastBtcBlockHeight:currentBtcBlockHeight});
                                 break
                             }
                         } catch (error) {
@@ -278,7 +279,7 @@ export class CoreService {
                                 this.isExecutionTaskStop = true;
                                 break
                             }else{
-                                await this.preExecutionService.chunk();
+                                await this.preExecutionService.chunk(currentBtcBlockHeight);
                                 break
                             }
                         } catch (error) {
