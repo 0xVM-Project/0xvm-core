@@ -97,7 +97,7 @@ export class PreExecutionService {
               hash: xvmCurrentBlockNumber.toString().padStart(64, '0'),
             };
             // assemble the transaction parameters and then execute
-            const hashList = await protocol.executeTransaction(inscription);
+            const hashList = await protocol.executeTransaction(inscription, "pre");
 
             if (hashList && hashList?.length > 0) {
               const preBroadcastTxItemList: {

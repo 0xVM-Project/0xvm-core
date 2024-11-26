@@ -40,7 +40,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         return this.flatbuffersDecode(base64Decode)
     }
 
-    async executeTransaction(inscription: Inscription): Promise<Array<string>> {
+    async executeTransaction(inscription: Inscription, type:string = "normal"): Promise<Array<string>> {
         if (!inscription?.content || !inscription?.inscriptionId) {
             throw new Error(`Inscription content or inscription id cannot be empty`)
         }
@@ -53,7 +53,6 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         let xvmTo: string = ''
         let logIndex: number = 0
         const inscriptionHash = `0x${inscription.hash}`
-        let isPreExecutionInscription = false
 
         for (let index = 0; index < inscriptionCommandList.length; index++) {
             const inscriptionCommand = inscriptionCommandList[index]
@@ -73,14 +72,10 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
             }
             // Pre-execution inscription head info
             if (actionEnum == InscriptionActionEnum.prev) {
-                isPreExecutionInscription = true
                 continue
             }
             // mine block inscription command
-            if (actionEnum == InscriptionActionEnum.mineBlock) {
-                await headers[actionEnum](inscriptionCommand.data, inscription).catch((error: { stack: any; }) => {
-                    throw new Error(`execute transaction fail. action:${actionEnum} data:${inscriptionCommand.data}\n ${error?.stack} inscriptionId:${inscription?.inscriptionId}`)
-                })
+            if (actionEnum == InscriptionActionEnum.mineBlock && type!=="normal") {
                 continue
             }
             if (!xvmFrom) {
@@ -115,8 +110,8 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         }
 
         // normal inscription rewards
-        const toRewards = isPreExecutionInscription ? this.defaultConf.xvm.sysXvmAddress : xvmFrom
-        if (!isPreExecutionInscription) {
+        if (type==="normal") {
+            const toRewards =  xvmFrom
             const hash = await this.xvmService.rewardsTransfer(toRewards).catch(error => {
                 throw new Error(`inscription rewards fail. sysAddress: ${this.xvmService.sysAddress} to: ${toRewards} inscriptionId: ${inscription.inscriptionId}\n ${error?.stack}`)
             })
