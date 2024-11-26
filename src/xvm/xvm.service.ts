@@ -75,14 +75,9 @@ export class XvmService {
         if (!ethers.isAddress(address)) {
             throw new Error(`Get nonce fail. invalid address`)
         }
-        if (address in this.userNonce && this.userNonce[address]) {
-            return this.userNonce[address]
-        } else {
-            const response = await this.rpcClient<XvmRpcBaseResponse>('eth_getTransactionCount', [address, "pending"])
-            const _nonce = response.data.result
-            this.userNonce[address] = Number.parseInt(_nonce, 16)
-            return this.userNonce[address]
-        }
+        const response = await this.rpcClient<XvmRpcBaseResponse>('eth_getTransactionCount', [address, "pending"])
+        const _nonce = response.data.result
+        return Number.parseInt(_nonce, 16)
     }
 
     async sendRawTransaction(signTransaction: string): Promise<string> {
@@ -109,9 +104,9 @@ export class XvmService {
             }
             this.logger.warn(errorMessage)
         }
-        if(!this.userNonce[unSignTransaction.from]){
-            this.userNonce[unSignTransaction.from]=parseInt(String(unSignTransaction.nonce), 16)+1
-        }else{
+        if (!this.userNonce[unSignTransaction.from]) {
+            this.userNonce[unSignTransaction.from] = parseInt(String(unSignTransaction.nonce), 16) + 1
+        } else {
             this.userNonce[unSignTransaction.from]++
         }
         return data.result
