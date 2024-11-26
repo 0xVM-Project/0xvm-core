@@ -10,6 +10,6 @@ export class AppService {
   }
 
   async preExecute(): Promise<boolean> {
-    return await this.coreService.preExecution();
+    return await this.coreService.executeMQ();
   }
 }

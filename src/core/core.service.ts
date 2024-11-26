@@ -28,8 +28,8 @@ export class CoreService {
     private latestBlockHeightForBtc: number
     private latestBlockHeightForXvm: number
     private diffBlock: number
-    private isExecutionRunning:boolean;
     private syncStatus: { isSuccess: boolean, latestBtcBlockHeight: number }
+    private messageQueue: { type: string, date: Date }[]
     public isExecutionTaskStop: boolean;
 
     constructor(
@@ -54,8 +54,8 @@ export class CoreService {
             isSuccess: false,
             latestBtcBlockHeight: this.firstInscriptionBlockHeight
         }
-        this.isExecutionRunning = false
         this.isExecutionTaskStop=false;
+        this.messageQueue=[];
     }
 
     get getSyncStatus(): { isSuccess: boolean, latestBtcBlockHeight: number } {
@@ -182,6 +182,35 @@ export class CoreService {
     async run() {
         // 1. sync history tx
         await this.sync()
+        await this.consumerMQ()
+    }
+
+    async consumerMQ() {
+        while (!this.isExecutionTaskStop) {
+            this.logger.debug(`this.messageQueue: ${JSON.stringify(this.messageQueue)}`)
+            while(this.messageQueue?.length > 0){
+                const mq = this.messageQueue.shift();
+
+                if(mq){
+                    if(mq?.type === "execute" && mq?.date){
+                        try {
+                            await this.preExecutionService.execute(mq?.date);
+                        } catch (error) {
+                            this.logger.error(`execute failed: ${JSON.stringify(error)}`)
+                            return false;
+                        }
+                    }
+
+                    if(mq?.type === "chunk"){
+                        await this.execution()
+                    }
+                }
+
+                await sleep(1000)
+            }
+
+            await sleep(5000)
+        }
     }
 
     /**
@@ -191,8 +220,7 @@ export class CoreService {
         const syncStatus = this.getSyncStatus;
 
         // sync completed and not executing
-        if(!this.isExecutionRunning && syncStatus.isSuccess){
-            this.isExecutionRunning = true;
+        if(syncStatus.isSuccess){
             let lastBtcBlockHeight = syncStatus.latestBtcBlockHeight;
             const lastConfig = await this.lastConfig.find({
                 take: 1,
@@ -224,7 +252,6 @@ export class CoreService {
                         try {
                             if (retryTotal > 6) {
                                 this.logger.warn(`normalExecution run retry failed several times, please manually process`)
-                                this.isExecutionRunning = false;
                                 this.isExecutionTaskStop = true;
                                 break
                             }else{
@@ -232,7 +259,6 @@ export class CoreService {
                                 await this.normalExecution(btcLatestBlockNumber, lastBtcBlockHeight + 1);
                                 // save lastBtcBlockHeight when completed
                                 await this.lastConfig.update({},{lastBtcBlockHeight:lastBtcBlockHeight+1});
-                                this.isExecutionRunning = false;
                                 break
                             }
                         } catch (error) {
@@ -249,12 +275,10 @@ export class CoreService {
                         try {
                             if (retryTotal > 6) {
                                 this.logger.warn(`preExecution run retry failed several times, please manually process`)
-                                this.isExecutionRunning = false;
                                 this.isExecutionTaskStop = true;
                                 break
                             }else{
                                 await this.preExecutionService.chunk();
-                                this.isExecutionRunning = false;
                                 break
                             }
                         } catch (error) {
@@ -323,23 +347,23 @@ export class CoreService {
             }
         }
     }
-    
-    async preExecution() {
-        try {
-            if (!this.isExecutionTaskStop) {
-                this.isExecutionRunning = true;
-                await this.preExecutionService.execute();
-                this.isExecutionRunning = false;
-                return true;
-            }
-        } catch (error) {
-            this.isExecutionRunning = false;
-            this.logger.error(`preExecution failed: ${JSON.stringify(error)}`)
-            return false;
-        }
-    }
 
     async prePackage(isEnforce?:boolean) {
         await this.preExecutionService.package(isEnforce);
+    }
+
+    async executeMQ() {
+        if (!this.isExecutionTaskStop) {
+            this.messageQueue.push({type:"execute",date:new Date()});
+            return true;
+        }
+
+        return false;
+    }
+
+    async chunkMQ() {
+        if (!this.isExecutionTaskStop) {
+            this.messageQueue.push({type:"chunk",date:new Date()});
+        }
     }
 }

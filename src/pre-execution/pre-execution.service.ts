@@ -12,12 +12,12 @@ import { HashMappingService } from 'src/router/protocol/hash-mapping/hash-mappin
 import { IProtocol } from 'src/router/router.interface';
 import { RouterService } from 'src/router/router.service';
 import { XvmService } from 'src/xvm/xvm.service';
-import { In, Repository } from 'typeorm';
+import { In, LessThan, Repository } from 'typeorm';
 
 @Injectable()
 export class PreExecutionService {
   private readonly logger = new Logger(PreExecutionService.name);
-  private readonly maxInscriptionSize = 500;
+  private readonly maxInscriptionSize = 10000;
 
   constructor(
     @InjectRepository(PendingTx)
@@ -35,7 +35,7 @@ export class PreExecutionService {
     private readonly defaultConf: ConfigType<typeof defaultConfig>,
   ) {}
 
-  async execute() {
+  async execute(date: Date) {
     // get latest xvm block height
     const xvmLatestBlockNumber = await this.xvmService.getLatestBlockNumber();
 
@@ -43,7 +43,7 @@ export class PreExecutionService {
       const xvmCurrentBlockNumber = xvmLatestBlockNumber + 1;
       // get pre-executed transactions from db
       const preTransactionList = await this.pendingTx.find({
-        where: { status: 1 },
+        where: { status: 1, createTime: LessThan(date) },
       });
 
       if (preTransactionList && preTransactionList?.length > 0) {
@@ -97,7 +97,10 @@ export class PreExecutionService {
               hash: xvmCurrentBlockNumber.toString().padStart(64, '0'),
             };
             // assemble the transaction parameters and then execute
-            const hashList = await protocol.executeTransaction(inscription, "pre");
+            const hashList = await protocol.executeTransaction(
+              inscription,
+              'pre',
+            );
 
             if (hashList && hashList?.length > 0) {
               const preBroadcastTxItemList: {
@@ -255,6 +258,11 @@ export class PreExecutionService {
                   data: `0x${xvmCurrentBlockNumber.toString(16).padStart(10, '0')}${Math.floor(Date.now() / 1000).toString(16)}`,
                 },
               );
+
+              await this.lastConfig.update(
+                {},
+                { lastBtcBlockHeight: xvmCurrentBlockNumber },
+              );
             } catch (error) {
               this.logger.error('update chunk data failed');
               throw error;
@@ -305,15 +313,16 @@ export class PreExecutionService {
             availableIdList.push(item?.id);
             const content = protocol.encodeInscription(availableList);
 
-            if (content && availableString.length < this.maxInscriptionSize) {
+            if (content) {
               // when the length of all unpacked transactions does not exceed the upper limit
-              availableString += content;
-
-              if (availableString.length >= this.maxInscriptionSize) {
-                // if the limit is exceeded by adding the next one, set the current transaction to the should-pack status
-                // the actual execution here will exceed the size of the upper limit of one transaction length, but it doesn't matter.
+              if (
+                availableString.length >= this.maxInscriptionSize ||
+                (availableString + content).length >= this.maxInscriptionSize
+              ) {
                 enablePackage = true;
                 break;
+              } else {
+                availableString += content;
               }
             }
           }

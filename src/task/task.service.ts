@@ -26,14 +26,14 @@ export class TaskService {
     }
   }
 
-  @Interval('pre-execute', 5000)
+  @Interval('pre-execute', 10000)
   async handleExecute() {
     try {
       if (this.coreService.isExecutionTaskStop) {
         const interval = this.schedulerRegistry.getInterval('pre-execute');
         clearInterval(interval);
       } else {
-        await this.coreService.execution();
+        await this.coreService.chunkMQ();
       }
     } catch (error) {
       this.logger.error(error instanceof Error ? error.stack : error);
