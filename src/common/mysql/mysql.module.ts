@@ -17,7 +17,8 @@ import dbMysqlConfig from 'src/config/db-mysql.config';
                     password: config.password,
                     database: config.database,
                     entities: config.entities,
-                    synchronize: config.synchronize
+                    synchronize: config.synchronize,
+                    timezone: config.timezone
                 }
             },
         }),

@@ -355,8 +355,7 @@ export class CoreService {
 
     async executeMQ() {
         if (!this.isExecutionTaskStop) {
-            const localDate = new Date();
-            const date =new Date(localDate.getTime() + localDate.getTimezoneOffset() * 60000 + 8*60*60*1000)
+            const date = new Date();
             this.messageQueue.push({type:"execute",date});
             return true;
         }
@@ -366,8 +365,7 @@ export class CoreService {
 
     async chunkMQ() {
         if (!this.isExecutionTaskStop) {
-            const localDate = new Date();
-            const date =new Date(localDate.getTime() + localDate.getTimezoneOffset() * 60000 + 8*60*60*1000)
+            const date = new Date();
             this.messageQueue.push({type:"chunk",date});
         }
     }

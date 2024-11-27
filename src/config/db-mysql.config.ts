@@ -26,4 +26,5 @@ export default registerAs('db-mysql', () => ({
     database: process.env.DB_DATABASE || 'test',
     entities: getEntities(),
     synchronize: process.env.DB_SYNCHRONIZE == 'true' ? true : false,
+    timezone: process.env.DB_TIMEZONE || 'Z'
 }));
