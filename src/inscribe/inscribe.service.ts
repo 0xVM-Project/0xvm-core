@@ -214,6 +214,7 @@ export class InscribeService {
         id: 'ASC',
       },
     });
+    this.logger.debug(`pendingTx: ${JSON.stringify(pendingTx)}`)
 
     if (pendingTx) {
       await this.commit(pendingTx);
@@ -226,6 +227,7 @@ export class InscribeService {
           id: 'ASC',
         },
       });
+      this.logger.debug(`readyTx: ${JSON.stringify(readyTx)}`)
 
       if (readyTx) {
         await this.transfer(readyTx);
@@ -238,6 +240,7 @@ export class InscribeService {
             id: 'ASC',
           },
         });
+        this.logger.debug(`initialTx: ${JSON.stringify(initialTx)}`)
 
         if (initialTx) {
           const completedTx = await this.preBroadcastTx.findOne({
@@ -248,6 +251,7 @@ export class InscribeService {
               id: 'DESC',
             },
           });
+          this.logger.debug(`completedTx: ${JSON.stringify(completedTx)}`)
 
           if (!completedTx) {
             await this.create(initialTx, feeRate);
@@ -266,7 +270,7 @@ export class InscribeService {
   async getFeeRate() {
     const feeSummary = await firstValueFrom(
       this.httpService.get<UnisatResponse<FeeRate>>(
-        'https://wallet-api-testnet.unisat.io/v5/default/fee-summary',
+        'https://wallet-api-testnet4.unisat.io/v5/default/fee-summary',
         {
           headers: {
             'Content-Type': 'application/json',

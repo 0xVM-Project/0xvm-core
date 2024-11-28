@@ -148,7 +148,7 @@ export async function relay(...txs: string[]) {
 async function postTx(rawtx: string): Promise<string> {
   try {
     const response = await axios.post(
-      `https://wallet-api-testnet.unisat.io/v5/tx/broadcast`,
+      `https://wallet-api-testnet4.unisat.io/v5/tx/broadcast`,
       { rawtx },
     );
     if (response.data.code == 0) {

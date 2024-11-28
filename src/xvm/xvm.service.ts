@@ -82,6 +82,8 @@ export class XvmService {
 
     async sendRawTransaction(signTransaction: string): Promise<string> {
         const unSignTransaction = this.unSignTransaction(signTransaction)
+        this.logger.debug(`unSignTransaction: ${JSON.stringify(unSignTransaction)}`);
+        this.logger.debug(`unSignTransaction.from: ${JSON.stringify(unSignTransaction.from)}`);
         if (!unSignTransaction) {
             throw new Error(`signTransaction cannot be parsed`)
         }
@@ -89,6 +91,7 @@ export class XvmService {
             throw new Error(`Unable to parse the from address from signTransaction`)
         }
         const response = await this.rpcClient<XvmRpcBaseResponse>('eth_sendRawTransaction', [signTransaction])
+        this.logger.debug(`response: ${JSON.stringify(response)}`);
         const data = response.data
         if ('error' in data) {
             const { code, message } = data.error as any
@@ -104,6 +107,7 @@ export class XvmService {
             }
             this.logger.warn(errorMessage)
         }
+        this.logger.debug(`this.userNonce[unSignTransaction.from]: ${JSON.stringify(this.userNonce[unSignTransaction.from])}`);
         if (!this.userNonce[unSignTransaction.from]) {
             this.userNonce[unSignTransaction.from] = parseInt(String(unSignTransaction.nonce), 16) + 1
         } else {
