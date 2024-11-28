@@ -1,8 +1,20 @@
-export interface XvmRpcBaseResponse<T = string> {
+export interface XvmRpcBaseResponse {
     jsonrpc: string,
-    result: T
     id: number
 }
+
+export interface XvmRpcSuccessResponse<T = string> extends XvmRpcBaseResponse {
+    result: T
+}
+
+export interface XvmRpcErrorResponse extends XvmRpcBaseResponse {
+    error: {
+        code: number,
+        message: string
+    }
+}
+
+export type XvmRpcResponse<T = string> = XvmRpcSuccessResponse<T> | XvmRpcErrorResponse
 
 export interface Block {
     author: string,
@@ -28,7 +40,7 @@ export interface Block {
     uncles: any[]
 }
 
-export interface XvmRpcGetBlockByNumber extends XvmRpcBaseResponse<Block> {
+export interface XvmRpcGetBlockByNumber extends XvmRpcSuccessResponse<Block> {
     result: Block
 }
 
@@ -44,17 +56,17 @@ export interface EngineCreateBlock {
     proof_size: number
 }
 
-export interface XvmRpcEngineCreateBlockResponse extends XvmRpcBaseResponse<EngineCreateBlock> {
+export interface XvmRpcEngineCreateBlockResponse extends XvmRpcSuccessResponse<EngineCreateBlock> {
     result: EngineCreateBlock
 }
 
 // evm_mine_block
-export interface EvmMineBlockResponse extends XvmRpcBaseResponse<string> {
+export interface EvmMineBlockResponse extends XvmRpcSuccessResponse<string> {
     result: string
 }
 
 // evm_revert_block
-export interface EvmRevertBlockResponse extends XvmRpcBaseResponse<boolean> {
+export interface EvmRevertBlockResponse extends XvmRpcSuccessResponse<boolean> {
     result: boolean
 }
 
@@ -84,7 +96,7 @@ export interface XvmBlockByNumber {
     size: string
 }
 
-export interface EvmBlockByNumberResponse extends XvmRpcBaseResponse<XvmBlockByNumber> {
+export interface EvmBlockByNumberResponse extends XvmRpcSuccessResponse<XvmBlockByNumber> {
     result: XvmBlockByNumber
 }
 

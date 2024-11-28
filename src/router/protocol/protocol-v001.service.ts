@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ProtocolVersionEnum } from '../router.enum';
-import { CommandsV1Type } from '../interface/protocol.interface'
+import { BaseCommandsType, CommandsV1Type, ExecutionModeEnum } from '../interface/protocol.interface'
 import { InscriptionActionEnum } from 'src/indexer/indexer.enum';
 import * as Flatbuffers from "./flatbuffers/output/zxvm";
 import * as flatbuffers from "flatbuffers";
@@ -13,6 +13,8 @@ import { OrdService } from 'src/ord/ord.service';
 import { Inscription } from 'src/ord/inscription.service';
 import { ProtocolBase } from './protocol-base';
 import { BtcrpcService } from 'src/common/api/btcrpc/btcrpc.service';
+import { inspect } from 'util';
+import { capitalizeFirstLetter } from 'src/utils/str.utils';
 
 
 @Injectable()
@@ -40,7 +42,45 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         return this.flatbuffersDecode(base64Decode)
     }
 
-    async executeTransaction(inscription: Inscription, type:string = "normal"): Promise<Array<string>> {
+    async commandExecution(commands: CommandsV1Type[], inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<Array<string>> {
+        let hashList: string[] = []
+        for (let index = 0; index < commands.length; index++) {
+            const command = commands[index];
+            const actionEnum = command.action as InscriptionActionEnum
+            const headers = {
+                [InscriptionActionEnum.prev]: this.prev.bind(this),
+                [InscriptionActionEnum.deploy]: this.deploy.bind(this),
+                [InscriptionActionEnum.execute]: this.execute.bind(this),
+                [InscriptionActionEnum.transfer]: this.transfer.bind(this),
+                [InscriptionActionEnum.deposit]: this.deposit.bind(this),
+                [InscriptionActionEnum.withdraw]: this.withdraw.bind(this),
+                [InscriptionActionEnum.mineBlock]: this.mineBlock.bind(this)
+            }
+            if (!(actionEnum in headers)) {
+                this.logger.warn(`[CommandExecution] Execution transaction fail, Action is out of scope`)
+                continue
+            }
+            const hash = await headers[actionEnum](command.data, inscriptionHash, executionMode)
+            if (hash) {
+                hashList.push(hash)
+            }
+        }
+        return hashList
+    }
+
+    async syncExecuteTransaction(inscription: Inscription){
+        if (!inscription?.content || !inscription?.inscriptionId) {
+            throw new Error(`Inscription content or inscription id cannot be empty`)
+        }
+        if (inscription.inscriptionId.length != 66) {
+            throw new Error(`Invalid inscription id, length must be 64, currently ${inscription.inscriptionId?.length}`)
+        }
+        const transactionHash: string[] = []
+        const inscriptionCommandList = this.decodeInscription(inscription.content)
+        const hashList = this.commandExecution(inscriptionCommandList,inscription.hash,ExecutionModeEnum.Normal)
+    }
+
+    async executeTransaction(inscription: Inscription, type: string = "normal"): Promise<Array<string>> {
         if (!inscription?.content || !inscription?.inscriptionId) {
             throw new Error(`Inscription content or inscription id cannot be empty`)
         }
@@ -75,7 +115,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
                 continue
             }
             // mine block inscription command
-            if (actionEnum == InscriptionActionEnum.mineBlock && type!=="normal") {
+            if (actionEnum == InscriptionActionEnum.mineBlock && type !== "normal") {
                 continue
             }
             if (!xvmFrom) {
@@ -110,8 +150,8 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         }
 
         // normal inscription rewards
-        if (type==="normal") {
-            const toRewards =  xvmFrom
+        if (type === "normal") {
+            const toRewards = xvmFrom
             const hash = await this.xvmService.rewardsTransfer(toRewards).catch(error => {
                 throw new Error(`inscription rewards fail. sysAddress: ${this.xvmService.sysAddress} to: ${toRewards} inscriptionId: ${inscription.inscriptionId}\n ${error?.stack}`)
             })
@@ -131,73 +171,100 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         return transactionHash
     }
 
-    async mineBlock(data: string, inscription?: Inscription): Promise<string> {
+    async mineBlock(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string> {
         const blockHeight = parseInt(data.slice(2, 12), 16)
         const blockTimestamp = parseInt(data.slice(12), 16)
         const minterBlockHash = await this.xvmService.minterBlock(blockTimestamp)
-        this.logger.log(`Precompute Inscription Generate Block ${blockHeight} is ${minterBlockHash}`)
+        this.logger.log(`[MineBlockFor${executionMode.toUpperCase()}] Generate Block ${blockHeight} is ${minterBlockHash} for Inscription Hash: ${inscriptionHash}`)
         return minterBlockHash
     }
 
-    async prev(data: string, inscription: Inscription): Promise<string> {
-        return ''
+    private async _handleTransaction(data: string, inscriptionHash: string, action: string, executionMode: ExecutionModeEnum): Promise<string> {
+        const formatAction = `${executionMode.toUpperCase()}-${capitalizeFirstLetter(action)}`
+        try {
+            const response = await this.xvmService.sendRawTransaction(data)
+            if ('result' in response) {
+                return response.result
+            }
+            const unSignTransaction = this.xvmService.unSignTransaction(data)
+            if (unSignTransaction && unSignTransaction.from.toLowerCase() == this.defaultConf.xvm.sysXvmAddress.toLowerCase()) {
+                throw new Error(`[${formatAction}] ${formatAction} failed. Inscription Hash: ${inscriptionHash} sender: ${unSignTransaction.from} to: ${unSignTransaction.to}`)
+            }
+            this.logger.warn(`[${formatAction}] ${formatAction} Failed. Inscription Hash: ${inscriptionHash} Caused by:${JSON.stringify(response.error)}`)
+            return null
+        } catch (error) {
+            const newError = new Error(`[${formatAction}] ${formatAction} Failed. Inscription Hash: ${inscriptionHash}`)
+            newError.stack = `${newError.stack}\nCaused by:${error instanceof Error ? error.stack : error}`
+            throw newError
+        }
     }
 
-    async deploy(data: string, inscription: Inscription): Promise<string> {
-        return await this.xvmService.sendRawTransaction(data)
+    async prev(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string> {
+        return null
     }
 
-    async execute(data: string, inscription: Inscription): Promise<string> {
-        return await this.xvmService.sendRawTransaction(data)
+    async deploy(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string> {
+        return await this._handleTransaction(data, inscriptionHash, this.deploy.name, executionMode)
     }
 
-    async transfer(data: string, inscription: Inscription): Promise<string> {
-        return await this.xvmService.sendRawTransaction(data)
+    async execute(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string> {
+        return await this._handleTransaction(data, inscriptionHash, this.execute.name, executionMode)
     }
 
-    async deposit(data: string, inscription: Inscription): Promise<string | null> {
+    async transfer(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string> {
+        return await this._handleTransaction(data, inscriptionHash, this.transfer.name, executionMode)
+    }
+
+    async deposit(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string | null> {
+        const formatAction = `${ExecutionModeEnum.Normal.toUpperCase()}-Deposit`
         const unSignTransaction = this.xvmService.unSignTransaction(data)
         if (!unSignTransaction) {
-            this.logger.warn(`Invalid command hash: ${inscription?.hash}`)
+            this.logger.warn(`Invalid command hash: ${inscriptionHash}`)
             return null
         }
         if (!unSignTransaction.from) {
-            this.logger.warn(`Invalid command hash: ${inscription?.hash}, Unable to parse the from address from signTransaction`)
+            this.logger.warn(`Invalid command hash: ${inscriptionHash}, Unable to parse the from address from signTransaction`)
             return null
         }
         const to = unSignTransaction.from
-        const txid = inscription.hash
+        const txid = inscriptionHash
         const depositOutput = await this.ordService.getInscriptionTxOutput(txid, 1)
         if (!depositOutput) {
-            this.logger.warn(`Invalid deposit. No deposit funds were sent. inscriptionId:${inscription.inscriptionId} sender:${unSignTransaction.from} inscriptionId:${inscription.inscriptionId}`)
+            this.logger.warn(`Invalid deposit. No deposit funds were sent. Inscription Hash:${inscriptionHash} sender:${unSignTransaction.from}`)
             return null
         }
         const { scriptPubKey: { address }, value } = depositOutput
         // If the output1 address is not the deposit address, the deposit is invalid.
         if (this.defaultConf.wallet.fundingAddress != address) {
-            this.logger.warn(`Invalid deposit. Invalid funds deposit address. inscriptionId:${inscription.inscriptionId} sender:${unSignTransaction.from}  deposit system address:${address}`)
+            this.logger.warn(`Invalid deposit. Invalid funds deposit address. Inscription Hash:${inscriptionHash} sender:${unSignTransaction.from}  deposit system address:${address}`)
             return null
         }
-        return await this.xvmService.depositTransfer(to, ethers.parseEther(value.toString()))
+        const response = await this.xvmService.depositTransfer(to, ethers.parseEther(value.toString()))
+        if ('error' in response) {
+            const newError = new Error(`[${formatAction}] Deposit Failed. Inscription Hash: ${inscriptionHash}`)
+            newError.stack = `${newError.stack}\n Caused by: ${JSON.stringify(response.error)}`
+            throw newError
+        }
+        return response.result
     }
 
-    async withdraw(data: string, inscription: Inscription): Promise<string | null> {
+    async withdraw(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string | null> {
         const unSignTransaction = this.xvmService.unSignTransaction(data)
         if (!unSignTransaction) {
-            this.logger.warn(`Invalid SignTransaction, cannot be parsed, hash=${inscription.hash}`)
+            this.logger.warn(`Invalid SignTransaction, cannot be parsed, hash=${inscriptionHash}`)
             return null
         }
         // verify withdraw command tx 
         if (this.defaultConf.xvm.xbtcPoolAddress.toLowerCase() != unSignTransaction.to?.toLowerCase()) {
-            this.logger.warn(`Invalid withdraw command(err Contract:${unSignTransaction.to}). inscriptionId:${inscription?.inscriptionId} sender:${unSignTransaction.from} withdraw amount:${unSignTransaction.value.toString()} wei`)
+            this.logger.warn(`Invalid withdraw command(err Contract:${unSignTransaction.to}). Inscription Hash:${inscriptionHash} sender:${unSignTransaction.from} withdraw amount:${unSignTransaction.value.toString()} wei`)
             return null
         }
         if (unSignTransaction.data != '0xd0e30db0') {
-            this.logger.warn(`Invalid withdraw command(err input data: ${unSignTransaction.data}). inscriptionId:${inscription?.inscriptionId} sender:${unSignTransaction.from} withdraw amount:${unSignTransaction.value.toString()} wei`)
+            this.logger.warn(`Invalid withdraw command(err input data: ${unSignTransaction.data}). Inscription Hash:${inscriptionHash} sender:${unSignTransaction.from} withdraw amount:${unSignTransaction.value.toString()} wei`)
             return null
         }
         // Deduction of xBTC balance
-        return await this.xvmService.sendRawTransaction(data)
+        await this._handleTransaction(data, inscriptionHash, this.withdraw.name, ExecutionModeEnum.Normal)
     }
 
     base64Decode(base64String: string): Uint8Array {

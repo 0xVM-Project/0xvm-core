@@ -4,9 +4,10 @@ import { ConfigType } from '@nestjs/config';
 import { Transaction, ethers } from 'ethers';
 import defaultConfig from 'src/config/default.config';
 import { firstValueFrom } from 'rxjs';
-import { EvmBlockByNumberResponse, EvmMineBlockResponse, EvmRevertBlockResponse, XvmBlockByNumber, XvmRpcBaseResponse, XvmRpcEngineCreateBlockResponse } from './xvm.interface';
+import { EvmBlockByNumberResponse, EvmMineBlockResponse, EvmRevertBlockResponse, XvmBlockByNumber, XvmRpcBaseResponse, XvmRpcEngineCreateBlockResponse, XvmRpcErrorResponse, XvmRpcResponse, XvmRpcSuccessResponse } from './xvm.interface';
 import { releaseParamSignature } from 'src/utils/paramSignature';
 import * as XBTCPoolABI from '../config/abi/XBTCPoolABI.json'
+import { SendRawTransactionRequestError } from 'src/router/protocol/errors/protocol-v001.errors';
 
 @Injectable()
 export class XvmService {
@@ -55,13 +56,13 @@ export class XvmService {
     }
 
     async getLatestBlockNumber(): Promise<number> {
-        const response = await this.rpcClient<XvmRpcBaseResponse>('eth_blockNumber', [])
+        const response = await this.rpcClient<XvmRpcSuccessResponse>('eth_blockNumber', [])
         const blockHeight = response.data.result
         return Number(Number(blockHeight).toString())
     }
 
     async getLatestBlock(transactionDetailFlag: boolean = false): Promise<EvmBlockByNumberResponse> {
-        const blockNumbeResponse = await this.rpcClient<XvmRpcBaseResponse>('eth_blockNumber', [])
+        const blockNumbeResponse = await this.rpcClient<XvmRpcSuccessResponse>('eth_blockNumber', [])
         const latestBlockHeight = blockNumbeResponse.data.result
         const blockByNumberResponse = await this.rpcClient<EvmBlockByNumberResponse>('eth_getBlockByNumber', [latestBlockHeight, transactionDetailFlag])
         return blockByNumberResponse.data
@@ -75,57 +76,51 @@ export class XvmService {
         if (!ethers.isAddress(address)) {
             throw new Error(`Get nonce fail. invalid address`)
         }
-        const response = await this.rpcClient<XvmRpcBaseResponse>('eth_getTransactionCount', [address, "pending"])
+        const response = await this.rpcClient<XvmRpcSuccessResponse>('eth_getTransactionCount', [address, "pending"])
         const _nonce = response.data.result
         return Number.parseInt(_nonce, 16)
     }
 
-    async sendRawTransaction(signTransaction: string): Promise<string> {
-        const unSignTransaction = this.unSignTransaction(signTransaction)
-        if (!unSignTransaction) {
-            throw new Error(`signTransaction cannot be parsed`)
-        }
-        if (!unSignTransaction.from) {
-            throw new Error(`Unable to parse the from address from signTransaction`)
-        }
-        const response = await this.rpcClient<XvmRpcBaseResponse>('eth_sendRawTransaction', [signTransaction])
-        const data = response.data
-        if ('error' in data) {
-            const { code, message } = data.error as any
-            let rawTx = unSignTransaction.toJSON()
-            rawTx = {
-                ...rawTx,
-                data: rawTx?.data != '0x' ? rawTx?.data.slice(0, 20) + '...' : rawTx?.data
+    async sendRawTransaction(signTransaction: string): Promise<XvmRpcResponse> {
+        try {
+            const response = await this.rpcClient<XvmRpcResponse>('eth_sendRawTransaction', [signTransaction])
+            const data = response.data
+            if ('error' in data) {
+                return data as XvmRpcErrorResponse
             }
-            const errorMessage = `${message}, error(code=${code}, error=${JSON.stringify(data?.error)}, payload=${response?.config?.data}, sender=${unSignTransaction.from}, to=${unSignTransaction?.to}, tx=${JSON.stringify(rawTx ?? {})})`
-            // Transactions sent from system addresses are not allowed to be abnormal
-            if (unSignTransaction.from.toLowerCase() == this.sysAddress.toLowerCase()) {
-                throw new Error(errorMessage)
-            }
-            this.logger.warn(errorMessage)
+            return data as XvmRpcSuccessResponse
+        } catch (error) {
+            const newError = new SendRawTransactionRequestError(error)
+            newError.stack = `${newError.stack}\nCaused by: ${error instanceof Error ? error.stack : error}`
+            throw newError
         }
-        if (!this.userNonce[unSignTransaction.from]) {
-            this.userNonce[unSignTransaction.from] = parseInt(String(unSignTransaction.nonce), 16) + 1
-        } else {
-            this.userNonce[unSignTransaction.from]++
-        }
-        return data.result
     }
 
-    async releaseXBTC(to: string, amount: ethers.BigNumberish): Promise<string> {
-        const gasPrice = this.feeData.gasPrice
+    async releaseXBTC(to: string, amount: ethers.BigNumberish): Promise<XvmRpcResponse> {
+        const {maxFeePerGas,maxPriorityFeePerGas} = this.feeData
         const nonce = await this.getNonce(this.sysAddress)
         const signMessage = await releaseParamSignature(to, amount, this.operatorWallet)
-        const tx = await this.xbtcPoolContract.release(to, amount, signMessage, { gasPrice: gasPrice, nonce: nonce, chainId: this.chainId })
-        this.userNonce[this.sysAddress]++
-        return tx.hash
+        const estimateGas = await this.xbtcPoolContract.release.estimateGas(to, amount, signMessage, { from: this.sysAddress })
+        const functionData = this.xbtcPoolContract.interface.encodeFunctionData('release', [to, amount, signMessage])
+        const tx: ethers.TransactionRequest = {
+            type: 2,
+            to: this.xbtcPoolAddress,
+            data: functionData,
+            gasLimit: estimateGas * 120n / 100n,
+            maxFeePerGas: maxFeePerGas,
+            maxPriorityFeePerGas: maxPriorityFeePerGas,
+            chainId: BigInt(this.chainId),
+            nonce: nonce
+        }
+        const signTransaction = await this.sysWallet.signTransaction(tx)
+        return await this.sendRawTransaction(signTransaction)
     }
 
-    async depositTransfer(to: string, amount: ethers.BigNumberish): Promise<string> {
+    async depositTransfer(to: string, amount: ethers.BigNumberish): Promise<XvmRpcResponse> {
         return await this.releaseXBTC(to, amount)
     }
 
-    async rewardsTransfer(to: string): Promise<string> {
+    async rewardsTransfer(to: string): Promise<XvmRpcResponse> {
         const amount = ethers.parseUnits('546', 10)
         return await this.releaseXBTC(to, amount)
     }

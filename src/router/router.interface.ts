@@ -1,7 +1,9 @@
+import { ExecutionModeEnum } from "./interface/protocol.interface"
+
 export interface IProtocol<I, C> {
     filterInscription(inscriptions: I): I | null
     decodeInscription(inscriptionContent: string): Array<C>
-    executeTransaction(inscription: I, type?:string): Promise<Array<string>>
+    executeTransaction(inscription: I, type?: string): Promise<Array<string>>
     encodeInscription(inscriptionArray: Array<C>): string | null
 
     /** protocol action
@@ -12,12 +14,12 @@ export interface IProtocol<I, C> {
     **  withdraw = 5
     */
 
-    deploy(data: string, inscription: I): Promise<string | null>
-    execute(data: string, inscription: I): Promise<string | null>
-    transfer(data: string, inscription: I): Promise<string | null>
-    deposit(data: string, inscription: I): Promise<string | null>
-    withdraw(data: string, inscription: I): Promise<string | null>
-    prev(data: string, inscription: I): Promise<string | null>
-    mineBlock(data: string): Promise<string | null>
+    deploy(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string | null>
+    execute(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string | null>
+    transfer(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string | null>
+    deposit(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string | null>
+    withdraw(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string | null>
+    prev(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string | null>
+    mineBlock(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string | null>
     isPrecomputeInscription(inscriptionContent: string): { isPrecompute: boolean, mineTimestamp: number, prevHash: string }
 }
