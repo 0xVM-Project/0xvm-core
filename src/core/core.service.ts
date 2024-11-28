@@ -29,7 +29,7 @@ export class CoreService {
     private latestBlockHeightForXvm: number
     private diffBlock: number
     private syncStatus: { isSuccess: boolean, latestBtcBlockHeight: number }
-    private messageQueue: { type: string, date: Date }[]
+    private messageQueue: { type: string, timestamp: number }[]
     public isExecutionTaskStop: boolean;
 
     constructor(
@@ -192,12 +192,11 @@ export class CoreService {
                 const mq = this.messageQueue.shift();
 
                 if(mq){
-                    if(mq?.type === "execute" && mq?.date){
+                    if(mq?.type === "execute" && mq?.timestamp){
                         try {
-                            await this.preExecutionService.execute(mq?.date);
+                            await this.preExecutionService.execute(mq?.timestamp);
                         } catch (error) {
                             this.logger.error(`execute failed: ${JSON.stringify(error)}`)
-                            return false;
                         }
                     }
 
@@ -355,8 +354,7 @@ export class CoreService {
 
     async executeMQ() {
         if (!this.isExecutionTaskStop) {
-            const date = new Date();
-            this.messageQueue.push({type:"execute",date});
+            this.messageQueue.push({type:"execute", timestamp: Date.now()});
             return true;
         }
 
@@ -365,8 +363,7 @@ export class CoreService {
 
     async chunkMQ() {
         if (!this.isExecutionTaskStop) {
-            const date = new Date();
-            this.messageQueue.push({type:"chunk",date});
+            this.messageQueue.push({type:"chunk", timestamp: Date.now()});
         }
     }
 }

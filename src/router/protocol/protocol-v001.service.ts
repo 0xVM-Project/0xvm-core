@@ -93,6 +93,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         let xvmTo: string = ''
         let logIndex: number = 0
         const inscriptionHash = `0x${inscription.hash}`
+        this.logger.debug(`inscriptionCommandList: ${JSON.stringify(inscriptionCommandList)}`)
 
         for (let index = 0; index < inscriptionCommandList.length; index++) {
             const inscriptionCommand = inscriptionCommandList[index]
@@ -132,6 +133,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
             const hash = await headers[actionEnum](inscriptionCommand.data, inscription).catch((error: { stack: any; }) => {
                 throw new Error(`execute transaction fail. action:${actionEnum} data:${inscriptionCommand.data}\n ${error?.stack} inscriptionId:${inscription?.inscriptionId}`)
             })
+            this.logger.debug(`hash: ${JSON.stringify(hash)}`)
             if (hash) {
                 // hash mapping
                 await this.hashMappingService.bindHash({

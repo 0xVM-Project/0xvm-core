@@ -35,7 +35,7 @@ export class PreExecutionService {
     private readonly defaultConf: ConfigType<typeof defaultConfig>,
   ) {}
 
-  async execute(date: Date) {
+  async execute(timestamp: number) {
     // get latest xvm block height
     const xvmLatestBlockNumber = await this.xvmService.getLatestBlockNumber();
 
@@ -43,8 +43,10 @@ export class PreExecutionService {
       const xvmCurrentBlockNumber = xvmLatestBlockNumber + 1;
       // get pre-executed transactions from db
       const preTransactionList = await this.pendingTx.find({
-        where: { status: 1, createTime: LessThan(date) },
+        where: { status: 1, createTime: LessThan(new Date(timestamp)) },
       });
+
+      this.logger.debug(`preTransactionList: ${JSON.stringify(preTransactionList)}`)
 
       if (preTransactionList && preTransactionList?.length > 0) {
         const protocol: IProtocol<any, any> = this.routerService.from('0f0001');
@@ -62,6 +64,7 @@ export class PreExecutionService {
             });
           }
         }
+        this.logger.debug(`decodeInscriptionList: ${JSON.stringify(decodeInscriptionList)}`)
 
         // execute all preTransactionList
         if (decodeInscriptionList && decodeInscriptionList?.length > 0) {
@@ -101,6 +104,7 @@ export class PreExecutionService {
               inscription,
               'pre',
             );
+            this.logger.debug(`hashList: ${JSON.stringify(hashList)}`)
 
             if (hashList && hashList?.length > 0) {
               const preBroadcastTxItemList: {
@@ -116,6 +120,7 @@ export class PreExecutionService {
                   });
                 });
               });
+              this.logger.debug(`preBroadcastTxItemList: ${JSON.stringify(preBroadcastTxItemList)}`)
 
               if (
                 preBroadcastTxItemList &&
@@ -191,7 +196,7 @@ export class PreExecutionService {
     }
   }
 
-  async chunk(currentBtcBlockHeight:number) {
+  async chunk(currentBtcBlockHeight: number) {
     // get latest xvm block height
     const xvmLatestBlockNumber = await this.xvmService.getLatestBlockNumber();
 
