@@ -42,33 +42,24 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         return this.flatbuffersDecode(base64Decode)
     }
 
-    async commandExecution(commands: CommandsV1Type[], inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<Array<string>> {
-        let hashList: string[] = []
-        for (let index = 0; index < commands.length; index++) {
-            const command = commands[index];
-            const actionEnum = command.action as InscriptionActionEnum
-            const headers = {
-                [InscriptionActionEnum.prev]: this.prev.bind(this),
-                [InscriptionActionEnum.deploy]: this.deploy.bind(this),
-                [InscriptionActionEnum.execute]: this.execute.bind(this),
-                [InscriptionActionEnum.transfer]: this.transfer.bind(this),
-                [InscriptionActionEnum.deposit]: this.deposit.bind(this),
-                [InscriptionActionEnum.withdraw]: this.withdraw.bind(this),
-                [InscriptionActionEnum.mineBlock]: this.mineBlock.bind(this)
-            }
-            if (!(actionEnum in headers)) {
-                this.logger.warn(`[CommandExecution] Execution transaction fail, Action is out of scope`)
-                continue
-            }
-            const hash = await headers[actionEnum](command.data, inscriptionHash, executionMode)
-            if (hash) {
-                hashList.push(hash)
-            }
+    async commandExecution(command: CommandsV1Type, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string> {
+        const actionEnum = command.action as InscriptionActionEnum
+        const headers = {
+            [InscriptionActionEnum.prev]: this.prev.bind(this),
+            [InscriptionActionEnum.deploy]: this.deploy.bind(this),
+            [InscriptionActionEnum.execute]: this.execute.bind(this),
+            [InscriptionActionEnum.transfer]: this.transfer.bind(this),
+            [InscriptionActionEnum.deposit]: this.deposit.bind(this),
+            [InscriptionActionEnum.withdraw]: this.withdraw.bind(this),
+            [InscriptionActionEnum.mineBlock]: this.mineBlock.bind(this)
         }
-        return hashList
+        if (!(actionEnum in headers)) {
+            this.logger.warn(`[CommandExecution] Execution transaction fail, Action is out of scope`)
+        }
+        return await headers[actionEnum](command.data, inscriptionHash, executionMode)
     }
 
-    async syncExecuteTransaction(inscription: Inscription){
+    async syncExecuteTransaction(inscription: Inscription) {
         if (!inscription?.content || !inscription?.inscriptionId) {
             throw new Error(`Inscription content or inscription id cannot be empty`)
         }
@@ -77,7 +68,15 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         }
         const transactionHash: string[] = []
         const inscriptionCommandList = this.decodeInscription(inscription.content)
-        const hashList = this.commandExecution(inscriptionCommandList,inscription.hash,ExecutionModeEnum.Normal)
+        for (let index = 0; index < inscriptionCommandList.length; index++) {
+            const command = inscriptionCommandList[index];
+            const hash = this.commandExecution(command, inscription.hash, ExecutionModeEnum.Normal)
+            // todo code
+        }
+    }
+
+    async preExecuteTransaction() {
+        // todo code
     }
 
     async executeTransaction(inscription: Inscription, type: string = "normal"): Promise<Array<string>> {
