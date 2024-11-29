@@ -8,6 +8,7 @@ import { EvmBlockByNumberResponse, EvmMineBlockResponse, EvmRevertBlockResponse,
 import { releaseParamSignature } from 'src/utils/paramSignature';
 import * as XBTCPoolABI from '../config/abi/XBTCPoolABI.json'
 import { SendRawTransactionRequestError } from 'src/router/protocol/errors/protocol-v001.errors';
+import { sleep } from 'src/utils/times';
 
 @Injectable()
 export class XvmService {
@@ -20,6 +21,8 @@ export class XvmService {
     public readonly sysAddress: string
     public readonly xbtcPoolAddress: string
     private readonly xbtcPoolContract: ethers.Contract
+    private readonly maxRetryCount: number = 6
+    private retryCount: number = 0
 
     constructor(
         @Inject(defaultConfig.KEY) private readonly defaultConf: ConfigType<typeof defaultConfig>,
@@ -83,17 +86,25 @@ export class XvmService {
     }
 
     async sendRawTransaction(signTransaction: string): Promise<XvmRpcResponse> {
-        try {
-            const response = await this.rpcClient<XvmRpcResponse>('eth_sendRawTransaction', [signTransaction])
-            const data = response.data
-            if ('error' in data) {
-                return data as XvmRpcErrorResponse
+        while (this.retryCount <= this.maxRetryCount) {
+            try {
+                const response = await this.rpcClient<XvmRpcResponse>('eth_sendRawTransaction', [signTransaction])
+                const data = response.data
+                this.retryCount = 0
+                if ('error' in data) {
+                    return data as XvmRpcErrorResponse
+                }
+                return data as XvmRpcSuccessResponse
+            } catch (error) {
+                await sleep(3000 * this.retryCount)
+                const newError = new SendRawTransactionRequestError(error)
+                newError.stack = `${newError.stack}\nCaused by: ${error instanceof Error ? error.stack : error}`
+                this.logger.error(`Send Raw Transaction request failed, Retry request [ ${this.retryCount + 1} ]th time. Caused by: ${newError.stack}`)
+                if (this.retryCount >= this.maxRetryCount) {
+                    throw newError
+                }
+                this.retryCount += 1
             }
-            return data as XvmRpcSuccessResponse
-        } catch (error) {
-            const newError = new SendRawTransactionRequestError(error)
-            newError.stack = `${newError.stack}\nCaused by: ${error instanceof Error ? error.stack : error}`
-            throw newError
         }
     }
 
