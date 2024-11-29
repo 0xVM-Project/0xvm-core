@@ -6,10 +6,12 @@ import { PreBroadcastTx } from 'src/entities/pre-broadcast-tx.entity';
 import { RouterModule } from 'src/router/router.module';
 import { InscribeService } from './inscribe.service';
 import { LastConfig } from 'src/entities/last-config.entity';
+import { IndexerModule } from 'src/indexer/indexer.module';
 
 @Module({
   imports: [
     RouterModule,
+    IndexerModule,
     TypeOrmModule.forFeature([
       PreBroadcastTx,
       LastConfig,
