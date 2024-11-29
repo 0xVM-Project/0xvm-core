@@ -29,6 +29,8 @@ export class TaskService {
   @Interval('pre-execute', 10000)
   async handleExecute() {
     try {
+      this.logger.debug(`pre-execute`)
+      this.logger.debug(`this.coreService.isExecutionTaskStop: ${JSON.stringify(this.coreService.isExecutionTaskStop)}`)
       if (this.coreService.isExecutionTaskStop) {
         const interval = this.schedulerRegistry.getInterval('pre-execute');
         clearInterval(interval);

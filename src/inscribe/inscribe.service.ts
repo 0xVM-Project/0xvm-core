@@ -11,12 +11,7 @@ import { PreBroadcastTxItem } from 'src/entities/pre-broadcast-tx-item.entity';
 import { PreBroadcastTx } from 'src/entities/pre-broadcast-tx.entity';
 import { RouterService } from 'src/router/router.service';
 import { BTCTransaction } from 'src/utils/btc-transaction';
-import {
-  checkIsChunked,
-  createCommit,
-  createReveal,
-  relay,
-} from 'src/utils/inscribe';
+import { createCommit, createReveal, relay } from 'src/utils/inscribe';
 import { In, Repository } from 'typeorm';
 import { FeeRate, UnisatResponse } from './inscribe.interface';
 
@@ -214,6 +209,7 @@ export class InscribeService {
         id: 'ASC',
       },
     });
+    this.logger.debug(`pendingTx: ${JSON.stringify(pendingTx)}`);
 
     if (pendingTx) {
       await this.commit(pendingTx);
@@ -226,6 +222,7 @@ export class InscribeService {
           id: 'ASC',
         },
       });
+      this.logger.debug(`readyTx: ${JSON.stringify(readyTx)}`);
 
       if (readyTx) {
         await this.transfer(readyTx);
@@ -238,26 +235,10 @@ export class InscribeService {
             id: 'ASC',
           },
         });
+        this.logger.debug(`initialTx: ${JSON.stringify(initialTx)}`);
 
         if (initialTx) {
-          const completedTx = await this.preBroadcastTx.findOne({
-            where: {
-              status: 4,
-            },
-            order: {
-              id: 'DESC',
-            },
-          });
-
-          if (!completedTx) {
-            await this.create(initialTx, feeRate);
-          } else if (completedTx && completedTx?.revealHash) {
-            const isChunked = await checkIsChunked(completedTx?.revealHash);
-
-            if (isChunked) {
-              await this.create(initialTx, feeRate);
-            }
-          }
+          await this.create(initialTx, feeRate);
         }
       }
     }
@@ -266,7 +247,7 @@ export class InscribeService {
   async getFeeRate() {
     const feeSummary = await firstValueFrom(
       this.httpService.get<UnisatResponse<FeeRate>>(
-        'https://wallet-api-testnet.unisat.io/v5/default/fee-summary',
+        'https://wallet-api-testnet4.unisat.io/v5/default/fee-summary',
         {
           headers: {
             'Content-Type': 'application/json',

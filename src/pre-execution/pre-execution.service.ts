@@ -46,7 +46,9 @@ export class PreExecutionService {
         where: { status: 1, createTime: LessThan(new Date(timestamp)) },
       });
 
-      this.logger.debug(`preTransactionList: ${JSON.stringify(preTransactionList)}`)
+      this.logger.debug(
+        `preTransactionList: ${JSON.stringify(preTransactionList?.length)}`,
+      );
 
       if (preTransactionList && preTransactionList?.length > 0) {
         const protocol: IProtocol<any, any> = this.routerService.from('0f0001');
@@ -64,7 +66,9 @@ export class PreExecutionService {
             });
           }
         }
-        this.logger.debug(`decodeInscriptionList: ${JSON.stringify(decodeInscriptionList)}`)
+        this.logger.debug(
+          `decodeInscriptionList: ${JSON.stringify(decodeInscriptionList?.length)}`,
+        );
 
         // execute all preTransactionList
         if (decodeInscriptionList && decodeInscriptionList?.length > 0) {
@@ -104,7 +108,7 @@ export class PreExecutionService {
               inscription,
               'pre',
             );
-            this.logger.debug(`hashList: ${JSON.stringify(hashList)}`)
+            this.logger.debug(`hashList: ${JSON.stringify(hashList)}`);
 
             if (hashList && hashList?.length > 0) {
               const preBroadcastTxItemList: {
@@ -120,7 +124,9 @@ export class PreExecutionService {
                   });
                 });
               });
-              this.logger.debug(`preBroadcastTxItemList: ${JSON.stringify(preBroadcastTxItemList)}`)
+              this.logger.debug(
+                `preBroadcastTxItemList: ${JSON.stringify(preBroadcastTxItemList?.length)}`,
+              );
 
               if (
                 preBroadcastTxItemList &&
@@ -196,14 +202,14 @@ export class PreExecutionService {
     }
   }
 
-  async chunk(currentBtcBlockHeight: number) {
+  async chunk(currentBtcBlockHeight: number, timestamp: number) {
     // get latest xvm block height
     const xvmLatestBlockNumber = await this.xvmService.getLatestBlockNumber();
 
     if (!isNaN(xvmLatestBlockNumber)) {
       const xvmCurrentBlockNumber = xvmLatestBlockNumber + 1;
       const preTransactionList = await this.pendingTx.find({
-        where: { status: 2 },
+        where: { status: 2, createTime: LessThan(new Date(timestamp)) },
       });
 
       if (preTransactionList && preTransactionList?.length > 0) {

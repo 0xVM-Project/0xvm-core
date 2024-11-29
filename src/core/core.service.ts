@@ -191,8 +191,8 @@ export class CoreService {
             while(this.messageQueue?.length > 0){
                 const mq = this.messageQueue.shift();
 
-                if(mq){
-                    if(mq?.type === "execute" && mq?.timestamp){
+                if(mq && mq?.timestamp){
+                    if(mq?.type === "execute"){
                         try {
                             await this.preExecutionService.execute(mq?.timestamp);
                         } catch (error) {
@@ -201,7 +201,7 @@ export class CoreService {
                     }
 
                     if(mq?.type === "chunk"){
-                        await this.execution()
+                        await this.execution(mq?.timestamp)
                     }
                 }
 
@@ -215,7 +215,7 @@ export class CoreService {
     /**
      * execution of transactions, including normal and pre-executed transactions
      */
-    async execution() {
+    async execution(timestamp: number) {
         const syncStatus = this.getSyncStatus;
 
         // sync completed and not executing
@@ -278,7 +278,7 @@ export class CoreService {
                                 this.isExecutionTaskStop = true;
                                 break
                             }else{
-                                await this.preExecutionService.chunk(currentBtcBlockHeight);
+                                await this.preExecutionService.chunk(currentBtcBlockHeight, timestamp);
                                 break
                             }
                         } catch (error) {

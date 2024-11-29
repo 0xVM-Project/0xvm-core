@@ -92,7 +92,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         let xvmTo: string = ''
         let logIndex: number = 0
         const inscriptionHash = `0x${inscription.hash}`
-        this.logger.debug(`inscriptionCommandList: ${JSON.stringify(inscriptionCommandList)}`)
+        this.logger.debug(`inscriptionCommandList: ${JSON.stringify(inscriptionCommandList?.length)}`)
 
         for (let index = 0; index < inscriptionCommandList.length; index++) {
             const inscriptionCommand = inscriptionCommandList[index]
@@ -118,6 +118,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
             if (actionEnum == InscriptionActionEnum.mineBlock && type !== "normal") {
                 continue
             }
+            this.logger.debug(`xvmFrom: ${JSON.stringify(xvmFrom)}`)
             if (!xvmFrom) {
                 const unSignTransaction = this.xvmService.unSignTransaction(inscriptionCommand.data)
                 if (!unSignTransaction) {
@@ -127,6 +128,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
                 xvmFrom = unSignTransaction.from
                 xvmTo = unSignTransaction.to
             }
+            this.logger.debug(`inscriptionCommandList: ${JSON.stringify(inscriptionCommandList?.length)}`)
 
             // Normal inscription command
             const hash = await headers[actionEnum](inscriptionCommand.data, inscription).catch((error: { stack: any; }) => {
@@ -149,6 +151,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
                 this.logger.warn(`[${inscription.blockHeight}] Send Transaction fail, action:${InscriptionActionEnum[actionEnum]} inscriptionId:${inscription.inscriptionId} data:${inscriptionCommand.data}`)
             }
         }
+        this.logger.debug(`transactionHash: ${transactionHash?.length}`)
 
         // normal inscription rewards
         if (type === "normal") {
