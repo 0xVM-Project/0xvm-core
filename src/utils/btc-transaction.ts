@@ -232,14 +232,7 @@ export class BTCTransaction {
     feeRate: number,
     maxFeeRate: number,
   ) {
-    const isBalanceAvailable = await this.checkBalanceAvailable();
-
-    if (!isBalanceAvailable) {
-      console.warn('The Btc balance is insufficient.');
-      return '';
-    }
-
-    const utxoResponse = await this.getUTXOs(this.p2tr.address!);
+    const utxoResponse = await this.getUTXOs();
     const utxos = utxoResponse?.data;
     if (!utxos || utxos.length === 0) {
       console.warn('No available UTXOs found for address.');
@@ -255,7 +248,8 @@ export class BTCTransaction {
     return txHex;
   }
 
-  async getUTXOs(address: string): Promise<UTXOResponse> {
+  async getUTXOs(): Promise<UTXOResponse> {
+    const address = this.p2tr.address;
     const url = `${this.unisatBaseUrl[this.network]}/address/btc-utxo?address=${address}`;
     const response = await axios.get(url, {
       headers: {
@@ -271,30 +265,5 @@ export class BTCTransaction {
       },
     });
     return response?.data;
-  }
-
-  async checkBalanceAvailable() {
-    const address = this.p2tr.address;
-    const url = `${this.unisatBaseUrl[this.network]}/address/balance?address=${address}`;
-    const response = await axios.get(url, {
-      headers: {
-        Accept: 'application/json',
-        'user-agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        'X-Client': 'UniSat Wallet',
-        'X-Version': '1.5.1',
-        'x-address': address,
-        'x-channel': 'store',
-        'x-flag': '0',
-        'x-udid': '3M1g0CuvtPgD',
-      },
-    });
-
-    return Boolean(
-      response &&
-        response?.data &&
-        response?.data?.data &&
-        response?.data?.data?.pending_btc_amount === '0.00000000',
-    );
   }
 }

@@ -9,6 +9,7 @@ import { HashMapping } from 'src/entities/hash-mapping.entity';
 import { LastConfig } from 'src/entities/last-config.entity';
 import { PreBroadcastTxItem } from 'src/entities/pre-broadcast-tx-item.entity';
 import { PreBroadcastTx } from 'src/entities/pre-broadcast-tx.entity';
+import { IndexerService } from 'src/indexer/indexer.service';
 import { RouterService } from 'src/router/router.service';
 import { BTCTransaction } from 'src/utils/btc-transaction';
 import { createCommit, createReveal, relay } from 'src/utils/inscribe';
@@ -35,6 +36,7 @@ export class InscribeService {
     private readonly defaultConf: ConfigType<typeof defaultConfig>,
     private readonly httpService: HttpService,
     private readonly routerService: RouterService,
+    private readonly indexerService: IndexerService,
   ) {
     const operatorPrivateKey = this.defaultConf.xvm.operatorPrivateKey;
     this.feeRate = this.defaultConf.wallet.btcFeeRate;
@@ -85,7 +87,7 @@ export class InscribeService {
             },
           );
         } catch (error) {
-          console.error('update preBroadcastTx failed');
+          this.logger.error('update preBroadcastTx failed');
           throw error;
         }
 
@@ -103,6 +105,13 @@ export class InscribeService {
   }
 
   async transfer(preBroadcastTx: PreBroadcastTx) {
+    const isUtxoAvailable = await this.checkUtxoAvailable();
+
+    if (!isUtxoAvailable) {
+      this.logger.log('The Btc balance is insufficient.');
+      return;
+    }
+
     const transferResult = await this.bTCTransaction.transfer(
       preBroadcastTx.temporaryAddress,
       preBroadcastTx.amount,
@@ -121,7 +130,7 @@ export class InscribeService {
           },
         );
       } catch (error) {
-        console.error('update preBroadcastTx failed');
+        this.logger.error('update preBroadcastTx failed');
         throw error;
       }
 
@@ -209,7 +218,6 @@ export class InscribeService {
         id: 'ASC',
       },
     });
-    this.logger.debug(`pendingTx: ${JSON.stringify(pendingTx)}`);
 
     if (pendingTx) {
       await this.commit(pendingTx);
@@ -222,7 +230,6 @@ export class InscribeService {
           id: 'ASC',
         },
       });
-      this.logger.debug(`readyTx: ${JSON.stringify(readyTx)}`);
 
       if (readyTx) {
         await this.transfer(readyTx);
@@ -235,7 +242,6 @@ export class InscribeService {
             id: 'ASC',
           },
         });
-        this.logger.debug(`initialTx: ${JSON.stringify(initialTx)}`);
 
         if (initialTx) {
           await this.create(initialTx, feeRate);
@@ -281,5 +287,27 @@ export class InscribeService {
     }
 
     return 0;
+  }
+
+  async checkUtxoAvailable() {
+    const utxoResponse = await this.bTCTransaction.getUTXOs();
+
+    if (utxoResponse) {
+      const utxos = utxoResponse?.data;
+
+      if (utxos && utxos?.length > 0) {
+        const btcLatestBlockNumber =
+          await this.indexerService.getLatestBlockNumberForBtc();
+
+        return Boolean(
+          btcLatestBlockNumber &&
+            utxos?.every(
+              (utxo) => utxo?.height && utxo?.height <= btcLatestBlockNumber,
+            ),
+        );
+      }
+    }
+
+    return false;
   }
 }
