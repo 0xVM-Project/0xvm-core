@@ -9,24 +9,20 @@ export type BTCNetwork = 'mainnet' | 'testnet';
 interface Utxo {
   txid: string;
   vout: number;
-  satoshi: number;
-  scriptType: number;
+  satoshis: number;
   scriptPk?: string;
-  codeType: number;
-  address: string;
-  height?: number;
-  idx: number;
-  isOpInRBF: boolean;
-  isSpent: boolean;
+  addressType?: number;
   inscriptions?: any[];
+  atomicals?: any[];
+  runes?: any[];
+  pubkey?: string;
+  height?: number;
 }
 
 interface UTXOResponse {
   code: number;
   msg: string;
-  data: {
-    utxo: Array<Utxo>;
-  };
+  data: Array<Utxo>;
 }
 
 export class BTCTransaction {
@@ -39,8 +35,8 @@ export class BTCTransaction {
   private readonly network: BTCNetwork;
 
   private readonly unisatBaseUrl = {
-    testnet: 'https://open-api-testnet.unisat.io/v1',
-    mainnet: 'https://open-api.unisat.io/v1',
+    testnet: 'https://wallet-api-testnet4.unisat.io/v5',
+    mainnet: 'https://wallet-api.unisat.io/v5',
   };
 
   constructor(hexPrivateKey: string, network: BTCNetwork = 'testnet') {
@@ -108,8 +104,7 @@ export class BTCTransaction {
     psbt.signAllInputs(keyPair);
     psbt.finalizeAllInputs();
     const virtualSize = psbt.extractTransaction().virtualSize();
-    const fee = virtualSize * feeRate;
-    return fee;
+    return virtualSize * feeRate;
   }
 
   tapTweakHash(pubKey: Buffer, h: Buffer | undefined): Buffer {
@@ -172,7 +167,7 @@ export class BTCTransaction {
       throw new Error(`No UTXOs found for address.`);
     }
     const satoshisTotal = utxos
-      .map((d) => d.satoshi)
+      .map((d) => d.satoshis)
       .reduce((prev, current) => prev + current);
     // console.log(
     //   `${sender} utxo amount: ${utxos.length} total: ${satoshisTotal} sats`,
@@ -183,7 +178,7 @@ export class BTCTransaction {
         index: utxo.vout,
         witnessUtxo: {
           script: this.p2tr.output!,
-          value: utxo.satoshi,
+          value: utxo.satoshis,
         },
         tapInternalKey: this.internalPubkey,
       });
@@ -237,8 +232,15 @@ export class BTCTransaction {
     feeRate: number,
     maxFeeRate: number,
   ) {
+    const isBalanceAvailable = await this.checkBalanceAvailable();
+
+    if (!isBalanceAvailable) {
+      console.warn('The Btc balance is insufficient.');
+      return '';
+    }
+
     const utxoResponse = await this.getUTXOs(this.p2tr.address!);
-    const utxos = utxoResponse?.data?.utxo;
+    const utxos = utxoResponse?.data;
     if (!utxos || utxos.length === 0) {
       console.warn('No available UTXOs found for address.');
       return '';
@@ -254,13 +256,45 @@ export class BTCTransaction {
   }
 
   async getUTXOs(address: string): Promise<UTXOResponse> {
-    const url = `${this.unisatBaseUrl[this.network]}/indexer/address/${address}/utxo-data?cursor=0&size=500&confirmed=true`;
+    const url = `${this.unisatBaseUrl[this.network]}/address/btc-utxo?address=${address}`;
     const response = await axios.get(url, {
       headers: {
-        accept: 'application/json',
-        Authorization: `Bearer ${process.env.UNISAT_API_KEY || ''}`,
+        Accept: 'application/json',
+        'user-agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'X-Client': 'UniSat Wallet',
+        'X-Version': '1.5.1',
+        'x-address': address,
+        'x-channel': 'store',
+        'x-flag': '0',
+        'x-udid': '3M1g0CuvtPgD',
       },
     });
     return response?.data;
+  }
+
+  async checkBalanceAvailable() {
+    const address = this.p2tr.address;
+    const url = `${this.unisatBaseUrl[this.network]}/address/balance?address=${address}`;
+    const response = await axios.get(url, {
+      headers: {
+        Accept: 'application/json',
+        'user-agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'X-Client': 'UniSat Wallet',
+        'X-Version': '1.5.1',
+        'x-address': address,
+        'x-channel': 'store',
+        'x-flag': '0',
+        'x-udid': '3M1g0CuvtPgD',
+      },
+    });
+
+    return Boolean(
+      response &&
+        response?.data &&
+        response?.data?.data &&
+        response?.data?.data?.pending_btc_amount === '0.00000000',
+    );
   }
 }
