@@ -4,23 +4,27 @@ import { CommonModule } from 'src/common/common.module';
 import { ApiModule } from 'src/common/api/api.module';
 import { BtcrpcService } from 'src/common/api/btcrpc/btcrpc.service';
 import { OrdModule } from './ord.module';
+import { OrdService } from './ord.service';
 
 describe('OrdService', () => {
   let module: TestingModule
   let service: InscriptionService;
   let btcApiService: BtcrpcService
+  let ordService: OrdService
 
   beforeAll(async () => {
     module = await Test.createTestingModule({
       imports: [
         CommonModule,
         ApiModule,
+        OrdModule
       ],
       providers: [InscriptionService],
     }).compile();
 
     service = module.get<InscriptionService>(InscriptionService)
     btcApiService = module.get<BtcrpcService>(BtcrpcService)
+    ordService = module.get<OrdService>(OrdService)
   });
 
   afterAll(async () => {
@@ -31,7 +35,7 @@ describe('OrdService', () => {
     expect(service).toBeDefined();
   });
 
-  it.only('parse insrcription', async () => {
+  it('parse insrcription', async () => {
     const txid = 'fff0ca7cfbaff6e5725cf4a8b269dcb2eb8194af2e626dfdc8627378bb79330f'
     const txinwitness = [
       "c1ba6a24748bb9d63466255593c3ccfe4e20ed98596d848f1d4a21cea2c65e2c73361ab7ffaf840c12d6b03522a19240e0f7dee360e9df605244d4b2f6b5d4ae",
@@ -59,5 +63,9 @@ describe('OrdService', () => {
         console.log(`length: ${data.contentLength} content(6): ${data.content}`)
       }
     }
+  })
+  it('getInscriptionGenesisAddress', async () => {
+    const address = await ordService.getInscriptionGenesisAddress('44103d5ecbab7586dfa07516f016d001886a30bf480186d64e2436795cf218d3')
+    expect('tb1pzzzum6hqusz8qfczhwpwsjutqd0nrumez0rdqda44977ds52swps22rmxc').toEqual(address)
   })
 });

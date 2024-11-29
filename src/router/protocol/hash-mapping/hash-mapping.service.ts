@@ -25,4 +25,17 @@ export class HashMappingService {
             throw error
         }
     }
+
+    /**
+     * Query the largest logindex mapping hash based on txid
+     * @param txid : txid is equivalent to btcHash
+     * @returns 
+     */
+    async getMappingHashByTxid(txid: string): Promise<HashMapping> {
+        const _txid = txid.startsWith('0x') ? txid.slice(2) : txid
+        return await this.hashMappingRepository.findOne({
+            where: [{ btcHash: _txid }, { btcHash: `0x${_txid}` }],
+            order: { logIndex: 'DESC' }
+        })
+    }
 }

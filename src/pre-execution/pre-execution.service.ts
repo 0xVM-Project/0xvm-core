@@ -7,7 +7,7 @@ import { PendingTx } from 'src/entities/pending-tx.entity';
 import { PreBroadcastTxItem } from 'src/entities/pre-broadcast-tx-item.entity';
 import { PreBroadcastTx } from 'src/entities/pre-broadcast-tx.entity';
 import { InscriptionActionEnum } from 'src/indexer/indexer.enum';
-import { CommandsV1Type } from 'src/router/interface/protocol.interface';
+import { CommandsV1Type, ExecutionModeEnum } from 'src/router/interface/protocol.interface';
 import { HashMappingService } from 'src/router/protocol/hash-mapping/hash-mapping.service';
 import { IProtocol } from 'src/router/router.interface';
 import { RouterService } from 'src/router/router.service';
@@ -33,7 +33,7 @@ export class PreExecutionService {
     private readonly xvmService: XvmService,
     @Inject(defaultConfig.KEY)
     private readonly defaultConf: ConfigType<typeof defaultConfig>,
-  ) {}
+  ) { }
 
   async execute(timestamp: number) {
     // get latest xvm block height
@@ -106,7 +106,7 @@ export class PreExecutionService {
             // assemble the transaction parameters and then execute
             const hashList = await protocol.executeTransaction(
               inscription,
-              'pre',
+              ExecutionModeEnum.PreExecution
             );
             this.logger.debug(`hashList: ${JSON.stringify(hashList)}`);
 
@@ -214,71 +214,69 @@ export class PreExecutionService {
 
       if (preTransactionList && preTransactionList?.length > 0) {
         const toRewards = this.defaultConf.xvm.sysXvmAddress;
-        const rewardHash = await this.xvmService
-          .rewardsTransfer(toRewards)
-          .catch((error) => {
-            throw new Error(
-              `inscription rewards fail. sysAddress: ${this.xvmService.sysAddress} to: ${toRewards} \n ${error?.stack}`,
+        const rewardResponse = await this.xvmService.rewardsTransfer(toRewards)
+        if ('result' in rewardResponse) {
+          const rewardHash = rewardResponse.result
+          if (rewardHash) {
+            await this.hashMappingService.bindHash({
+              xFromAddress: toRewards,
+              xToAddress: toRewards,
+              btcHash: `0x${xvmCurrentBlockNumber.toString().padStart(64, '0')}`,
+              xvmHash: rewardHash,
+              logIndex: preTransactionList?.length,
+            });
+            this.logger.log(
+              `[${xvmCurrentBlockNumber}] Send Inscription Rewards[546*(10^8)] success, hash: ${rewardHash}`,
             );
-          });
 
-        if (rewardHash) {
-          await this.hashMappingService.bindHash({
-            xFromAddress: toRewards,
-            xToAddress: toRewards,
-            btcHash: `0x${xvmCurrentBlockNumber.toString().padStart(64, '0')}`,
-            xvmHash: rewardHash,
-            logIndex: preTransactionList?.length,
-          });
-          this.logger.log(
-            `[${xvmCurrentBlockNumber}] Send Inscription Rewards[546*(10^8)] success, hash: ${rewardHash}`,
-          );
+            const protocol: IProtocol<any, any> =
+              this.routerService.from('0f0001');
+            const minterBlockHash = await protocol.mineBlock(
+              `0x${xvmCurrentBlockNumber.toString(16).padStart(10, '0')}${Math.floor(Date.now() / 1000).toString(16)}`, '', ExecutionModeEnum.PreExecution
+            );
 
-          const protocol: IProtocol<any, any> =
-            this.routerService.from('0f0001');
-          const minterBlockHash = await protocol.mineBlock(
-            `0x${xvmCurrentBlockNumber.toString(16).padStart(10, '0')}${Math.floor(Date.now() / 1000).toString(16)}`,
-          );
-
-          if (minterBlockHash) {
-            try {
-              await this.pendingTx.update(
-                {
-                  id: In(
-                    preTransactionList?.map(
-                      (_preTransactionItem) => _preTransactionItem?.id,
+            if (minterBlockHash) {
+              try {
+                await this.pendingTx.update(
+                  {
+                    id: In(
+                      preTransactionList?.map(
+                        (_preTransactionItem) => _preTransactionItem?.id,
+                      ),
                     ),
-                  ),
-                },
-                {
-                  status: 4,
-                },
-              );
+                  },
+                  {
+                    status: 4,
+                  },
+                );
 
-              await this.preBroadcastTxItem.update(
-                {
-                  pendingTxId: In(
-                    preTransactionList?.map(
-                      (_preTransactionItem) => _preTransactionItem?.id,
+                await this.preBroadcastTxItem.update(
+                  {
+                    pendingTxId: In(
+                      preTransactionList?.map(
+                        (_preTransactionItem) => _preTransactionItem?.id,
+                      ),
                     ),
-                  ),
-                  type: 2,
-                  action: 6,
-                },
-                {
-                  data: `0x${xvmCurrentBlockNumber.toString(16).padStart(10, '0')}${Math.floor(Date.now() / 1000).toString(16)}`,
-                },
-              );
+                    type: 2,
+                    action: 6,
+                  },
+                  {
+                    data: `0x${xvmCurrentBlockNumber.toString(16).padStart(10, '0')}${Math.floor(Date.now() / 1000).toString(16)}`,
+                  },
+                );
 
-              await this.lastConfig.update(
-                {},
-                { lastBtcBlockHeight: currentBtcBlockHeight },
-              );
-            } catch (error) {
-              this.logger.error('update chunk data failed');
-              throw error;
+                await this.lastConfig.update(
+                  {},
+                  { lastBtcBlockHeight: currentBtcBlockHeight },
+                );
+              } catch (error) {
+                this.logger.error('update chunk data failed');
+                throw error;
+              }
             }
           }
+        } else {
+          this.logger.warn(`[${ExecutionModeEnum.PreExecution}] inscription rewards failed. Caused by: ${JSON.stringify(rewardResponse?.error)}`)
         }
       }
     }

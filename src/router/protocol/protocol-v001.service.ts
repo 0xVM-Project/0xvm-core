@@ -15,6 +15,7 @@ import { ProtocolBase } from './protocol-base';
 import { BtcrpcService } from 'src/common/api/btcrpc/btcrpc.service';
 import { inspect } from 'util';
 import { capitalizeFirstLetter } from 'src/utils/str.utils';
+import { HashMappingInterface } from './hash-mapping/hash.interface';
 
 
 @Injectable()
@@ -42,6 +43,36 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         return this.flatbuffersDecode(base64Decode)
     }
 
+    async inscriptionRewards(rewardReceiveAddress: string, inscriptionHash: string, executionMode: ExecutionModeEnum = ExecutionModeEnum.Normal) {
+        const title = `RewardXBTC-${capitalizeFirstLetter(executionMode)}`
+        if (rewardReceiveAddress) {
+            const rewardsTransferResponse = await this.xvmService.rewardsTransfer(rewardReceiveAddress)
+            if ('result' in rewardsTransferResponse) {
+                try {
+                    // hash mapping
+                    const latestHashMappingByBtcHash = await this.hashMappingService.getMappingHashByTxid(inscriptionHash)
+                    const logIndex = latestHashMappingByBtcHash ? latestHashMappingByBtcHash.logIndex + 1 : 0
+                    const rewardTransactionMappingHash: HashMappingInterface = {
+                        xFromAddress: this.xvmService.sysAddress,
+                        xToAddress: rewardReceiveAddress,
+                        btcHash: inscriptionHash,
+                        xvmHash: rewardsTransferResponse.result,
+                        logIndex: logIndex
+                    }
+                    await this.hashMappingService.bindHash(rewardTransactionMappingHash)
+                } catch (error) {
+                    const newError = new Error(`[${title}] Reward mapping hash failed. Inscription Hash: ${inscriptionHash}`)
+                    newError.stack = `${newError.stack}\n  Caused by: ${error instanceof Error ? error.stack : error}`
+                    throw newError
+                }
+            } else {
+                this.logger.warn(`${title} distribution failed. Inscription Hash: ${inscriptionHash} Caused by: ${JSON.stringify(rewardsTransferResponse?.error)}`)
+            }
+        } else {
+            this.logger.warn(`${title} distribution failed. Inscription Hash: ${inscriptionHash} Caused by: Missing reward receiving address`)
+        }
+    }
+
     async commandExecution(command: CommandsV1Type, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string> {
         const actionEnum = command.action as InscriptionActionEnum
         const headers = {
@@ -59,7 +90,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         return await headers[actionEnum](command.data, inscriptionHash, executionMode)
     }
 
-    async syncExecuteTransaction(inscription: Inscription) {
+    async syncExecuteTransaction(inscription: Inscription): Promise<Array<string>> {
         if (!inscription?.content || !inscription?.inscriptionId) {
             throw new Error(`Inscription content or inscription id cannot be empty`)
         }
@@ -68,18 +99,41 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         }
         const transactionHash: string[] = []
         const inscriptionCommandList = this.decodeInscription(inscription.content)
+        const inscriptionSignAddressList: string[] = []
+        let logIndex = 0
         for (let index = 0; index < inscriptionCommandList.length; index++) {
             const command = inscriptionCommandList[index];
-            const hash = this.commandExecution(command, inscription.hash, ExecutionModeEnum.Normal)
+            const hash = await this.commandExecution(command, inscription.hash, ExecutionModeEnum.Normal)
             // todo code
+            if (hash) {
+                transactionHash.push(hash)
+                const unsingTransaction = this.xvmService.unSignTransaction(command.data)
+                const xvmFrom = unsingTransaction.from
+                const xvmTo = unsingTransaction.to
+                unsingTransaction && inscriptionSignAddressList.push(xvmFrom)
+                const executeTransactionMappingHash: HashMappingInterface = {
+                    xFromAddress: xvmFrom ?? '',
+                    xToAddress: xvmTo ?? '',
+                    btcHash: inscription.hash,
+                    xvmHash: hash,
+                    logIndex: logIndex
+                }
+                // hash mapping
+                await this.hashMappingService.bindHash(executeTransactionMappingHash)
+                logIndex += 1
+                this.logger.log(`[${inscription.blockHeight}] ${ExecutionModeEnum.Normal} transaction execute success, action:${InscriptionActionEnum[command.action]}  hash: ${hash}`)
+            }
         }
+        // inscription rewards
+        if (!inscriptionSignAddressList.every((item) => item === inscriptionSignAddressList[0])) {
+            this.logger.warn(`Inscription command have multiple signature addresses, Inscription Hash: ${inscription.hash}`)
+        }
+        const rewardReceiveAddress = inscriptionSignAddressList.at(0)
+        await this.inscriptionRewards(rewardReceiveAddress, inscription.hash)
+        return transactionHash
     }
 
-    async preExecuteTransaction() {
-        // todo code
-    }
-
-    async executeTransaction(inscription: Inscription, type: string = "normal"): Promise<Array<string>> {
+    async preExecuteTransaction(inscription: Inscription) {
         if (!inscription?.content || !inscription?.inscriptionId) {
             throw new Error(`Inscription content or inscription id cannot be empty`)
         }
@@ -88,91 +142,46 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         }
         const transactionHash: string[] = []
         const inscriptionCommandList = this.decodeInscription(inscription.content)
-        let xvmFrom: string = ''
-        let xvmTo: string = ''
-        let logIndex: number = 0
-        const inscriptionHash = `0x${inscription.hash}`
-        this.logger.debug(`inscriptionCommandList: ${JSON.stringify(inscriptionCommandList?.length)}`)
-
+        const inscriptionSignAddressList: string[] = []
+        let logIndex = 0
         for (let index = 0; index < inscriptionCommandList.length; index++) {
-            const inscriptionCommand = inscriptionCommandList[index]
-            const actionEnum = inscriptionCommand.action as InscriptionActionEnum
-            const headers = {
-                [InscriptionActionEnum.prev]: this.prev.bind(this),
-                [InscriptionActionEnum.deploy]: this.deploy.bind(this),
-                [InscriptionActionEnum.execute]: this.execute.bind(this),
-                [InscriptionActionEnum.transfer]: this.transfer.bind(this),
-                [InscriptionActionEnum.deposit]: this.deposit.bind(this),
-                [InscriptionActionEnum.withdraw]: this.withdraw.bind(this),
-                [InscriptionActionEnum.mineBlock]: this.mineBlock.bind(this)
-            }
-            if (!(actionEnum in headers)) {
-                this.logger.warn(`create transaction fail, Action is out of scope`)
-                return []
-            }
-            // Pre-execution inscription head info
-            if (actionEnum == InscriptionActionEnum.prev) {
-                continue
-            }
-            // mine block inscription command
-            if (actionEnum == InscriptionActionEnum.mineBlock && type !== "normal") {
-                continue
-            }
-            this.logger.debug(`xvmFrom: ${JSON.stringify(xvmFrom)}`)
-            if (!xvmFrom) {
-                const unSignTransaction = this.xvmService.unSignTransaction(inscriptionCommand.data)
-                if (!unSignTransaction) {
-                    this.logger.warn(`unsign transaction fail. Invalid command hash: ${inscription?.hash}, index: ${index}`)
-                    continue
+            const command = inscriptionCommandList[index];
+            const hash = await this.commandExecution(command, inscription.hash, ExecutionModeEnum.PreExecution)
+            // todo code
+            if (hash) {
+                transactionHash.push(hash)
+                const unsingTransaction = this.xvmService.unSignTransaction(command.data)
+                const xvmFrom = unsingTransaction.from
+                const xvmTo = unsingTransaction.to
+                unsingTransaction && inscriptionSignAddressList.push(xvmFrom)
+                const executeTransactionMappingHash: HashMappingInterface = {
+                    xFromAddress: xvmFrom ?? '',
+                    xToAddress: xvmTo ?? '',
+                    btcHash: inscription.hash,
+                    xvmHash: hash,
+                    logIndex: logIndex
                 }
-                xvmFrom = unSignTransaction.from
-                xvmTo = unSignTransaction.to
-            }
-            this.logger.debug(`inscriptionCommandList: ${JSON.stringify(inscriptionCommandList?.length)}`)
-
-            // Normal inscription command
-            const hash = await headers[actionEnum](inscriptionCommand.data, inscription).catch((error: { stack: any; }) => {
-                throw new Error(`execute transaction fail. action:${actionEnum} data:${inscriptionCommand.data}\n ${error?.stack} inscriptionId:${inscription?.inscriptionId}`)
-            })
-            this.logger.debug(`hash: ${JSON.stringify(hash)}`)
-            if (hash) {
                 // hash mapping
-                await this.hashMappingService.bindHash({
-                    xFromAddress: xvmFrom ?? '',
-                    xToAddress: xvmTo ?? '',
-                    btcHash: inscriptionHash,
-                    xvmHash: hash,
-                    logIndex: logIndex
-                })
+                await this.hashMappingService.bindHash(executeTransactionMappingHash)
                 logIndex += 1
-                transactionHash.push(hash)
-                this.logger.log(`[${inscription.blockHeight}] Send Transaction success, action:${InscriptionActionEnum[actionEnum]}  hash: ${hash}`)
-            } else {
-                this.logger.warn(`[${inscription.blockHeight}] Send Transaction fail, action:${InscriptionActionEnum[actionEnum]} inscriptionId:${inscription.inscriptionId} data:${inscriptionCommand.data}`)
+                this.logger.log(`[${inscription.blockHeight}] ${ExecutionModeEnum.PreExecution} transaction execute success, action:${InscriptionActionEnum[command.action]}  hash: ${hash}`)
             }
         }
-        this.logger.debug(`transactionHash: ${transactionHash?.length}`)
-
-        // normal inscription rewards
-        if (type === "normal") {
-            const toRewards = xvmFrom
-            const hash = await this.xvmService.rewardsTransfer(toRewards).catch(error => {
-                throw new Error(`inscription rewards fail. sysAddress: ${this.xvmService.sysAddress} to: ${toRewards} inscriptionId: ${inscription.inscriptionId}\n ${error?.stack}`)
-            })
-            if (hash) {
-                // hash mapping        
-                await this.hashMappingService.bindHash({
-                    xFromAddress: xvmFrom ?? '',
-                    xToAddress: xvmTo ?? '',
-                    btcHash: inscriptionHash,
-                    xvmHash: hash,
-                    logIndex: logIndex
-                })
-                transactionHash.push(hash)
-            }
-            this.logger.log(`[${inscription?.blockHeight}] Send Inscription Rewards[546*(10^8)] success, hash: ${hash}`)
+        // inscription rewards
+        if (!inscriptionSignAddressList.every((item) => item === inscriptionSignAddressList[0])) {
+            this.logger.warn(`Inscription command have multiple signature addresses, Inscription Hash: ${inscription.hash}`)
         }
+        const rewardReceiveAddress = inscriptionSignAddressList.at(0)
+        await this.inscriptionRewards(rewardReceiveAddress, inscription.hash, ExecutionModeEnum.PreExecution)
         return transactionHash
+    }
+
+    async executeTransaction(inscription: Inscription, executionMode: ExecutionModeEnum = ExecutionModeEnum.Normal): Promise<Array<string>> {
+        if (executionMode === ExecutionModeEnum.Normal) {
+            return await this.syncExecuteTransaction(inscription)
+        } else {
+            return await this.preExecuteTransaction(inscription)
+        }
     }
 
     async mineBlock(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string> {

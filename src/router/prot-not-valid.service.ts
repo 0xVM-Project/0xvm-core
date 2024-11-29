@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ProtocolBase } from './protocol/protocol-base';
 import { Inscription } from 'src/ord/inscription.service';
-import { BaseCommandsType } from './interface/protocol.interface';
+import { BaseCommandsType, ExecutionModeEnum } from './interface/protocol.interface';
 
 @Injectable()
 export class ProtNotValidService extends ProtocolBase<Inscription, BaseCommandsType> {
@@ -13,7 +13,7 @@ export class ProtNotValidService extends ProtocolBase<Inscription, BaseCommandsT
         return []
     }
 
-    async executeTransaction(inscription: any): Promise<Array<string>> {
+    async executeTransaction(inscription: any,executionMode: ExecutionModeEnum): Promise<Array<string>> {
         return []
     }
 
@@ -31,13 +31,13 @@ export class ProtNotValidService extends ProtocolBase<Inscription, BaseCommandsT
     **  mineBlock = 6
     */
 
-    async prev(data: string, inscription: Inscription): Promise<string | null> { return null }
-    async mineBlock(data: string): Promise<string | null> { return null }
-    async deploy(data: string, inscription: Inscription): Promise<string | null> { return null }
-    async execute(data: string, inscription: Inscription): Promise<string | null> { return null }
-    async transfer(data: string, inscription: Inscription): Promise<string | null> { return null }
-    async deposit(data: string, inscription: Inscription): Promise<string | null> { return null }
-    async withdraw(data: string, inscription: Inscription): Promise<string | null> { return null }
+    async prev(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string | null> { return null }
+    async mineBlock(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string | null> { return null }
+    async deploy(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string | null> { return null }
+    async execute(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string | null> { return null }
+    async transfer(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string | null> { return null }
+    async deposit(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string | null> { return null }
+    async withdraw(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string | null> { return null }
 
     isPrecomputeInscription(inscriptionContent: string): { isPrecompute: boolean, mineTimestamp: number, prevHash: string } { return { isPrecompute: false, mineTimestamp: 0, prevHash: '' } }
 }

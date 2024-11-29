@@ -19,7 +19,6 @@ export class XvmService {
     private feeData: ethers.FeeData
     public readonly sysAddress: string
     public readonly xbtcPoolAddress: string
-    private userNonce: Record<string, number> = {}
     private readonly xbtcPoolContract: ethers.Contract
 
     constructor(
@@ -68,17 +67,19 @@ export class XvmService {
         return blockByNumberResponse.data
     }
 
-    initNonce() {
-        this.userNonce = {}
-    }
-
     async getNonce(address: string): Promise<number> {
         if (!ethers.isAddress(address)) {
             throw new Error(`Get nonce fail. invalid address`)
         }
-        const response = await this.rpcClient<XvmRpcSuccessResponse>('eth_getTransactionCount', [address, "pending"])
-        const _nonce = response.data.result
-        return Number.parseInt(_nonce, 16)
+        try {
+            const response = await this.rpcClient<XvmRpcSuccessResponse>('eth_getTransactionCount', [address, "pending"])
+            const _nonce = response.data.result
+            return Number.parseInt(_nonce, 16)
+        } catch (error) {
+            const newError = new Error(`[GetNonce] get nonce failed. address: ${address}`)
+            newError.stack = `${newError.stack}\n Caused by: ${error instanceof Error ? error.stack : error}`
+            throw newError
+        }
     }
 
     async sendRawTransaction(signTransaction: string): Promise<XvmRpcResponse> {
@@ -97,7 +98,7 @@ export class XvmService {
     }
 
     async releaseXBTC(to: string, amount: ethers.BigNumberish): Promise<XvmRpcResponse> {
-        const {maxFeePerGas,maxPriorityFeePerGas} = this.feeData
+        const { maxFeePerGas, maxPriorityFeePerGas } = this.feeData
         const nonce = await this.getNonce(this.sysAddress)
         const signMessage = await releaseParamSignature(to, amount, this.operatorWallet)
         const estimateGas = await this.xbtcPoolContract.release.estimateGas(to, amount, signMessage, { from: this.sysAddress })

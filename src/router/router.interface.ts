@@ -3,7 +3,7 @@ import { ExecutionModeEnum } from "./interface/protocol.interface"
 export interface IProtocol<I, C> {
     filterInscription(inscriptions: I): I | null
     decodeInscription(inscriptionContent: string): Array<C>
-    executeTransaction(inscription: I, type?: string): Promise<Array<string>>
+    executeTransaction(inscription: I, executionMode?: ExecutionModeEnum): Promise<Array<string>>
     encodeInscription(inscriptionArray: Array<C>): string | null
 
     /** protocol action

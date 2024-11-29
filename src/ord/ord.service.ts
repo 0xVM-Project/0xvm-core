@@ -71,4 +71,17 @@ export class OrdService {
             throw new Error(`Failed to obtain the recharge fund transfer address. txid=${txid}  ${err instanceof Error ? err?.stack : err}`)
         }
     }
+
+    async getInscriptionGenesisAddress(txid: string) {
+        try {
+            const { result: result } = await this.btcrpcService.getRawtransaction(txid)
+            const vin0 = result.vin[0]
+            const transferVin0 = (await this.btcrpcService.getRawtransaction(vin0.txid)).result.vin[0]
+            const origin = await this.btcrpcService.getRawtransaction(transferVin0.txid)
+            const { scriptPubKey: { address } } = origin.result.vout[transferVin0.vout]
+            return address
+        } catch (error) {
+            throw new Error(`[GetInscriptionGenesisAddress] Failed to fetch inscription genesis address. Caused by: ${error instanceof Error ? error.stack : error}`)
+        }
+    }
 }
