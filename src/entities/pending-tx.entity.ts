@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Unique, Index } from 'typeorm';
 
-@Entity('pending_tx')
+@Entity('pending_tx', { synchronize: false })
 @Unique('idx_order_id', ['orderId'])
 @Index('idx_status', ['status'])
 export class PendingTx {
