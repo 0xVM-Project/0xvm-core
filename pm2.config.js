@@ -8,9 +8,9 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: '2G',
-      log_file: './logs/system.log',
-      out_file: './logs/out.log',
-      error_file: './logs/error.log',
+      // log_file: './logs/system.log',
+      // out_file: './logs/out.log',
+      // error_file: './logs/error.log',
       // Do not set the log_date_format option, because the program log already records the time.
       // log_date_format: 'YYYY-MM-DD HH:mm:ss',
     },
