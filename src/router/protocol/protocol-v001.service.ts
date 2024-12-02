@@ -166,6 +166,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         if (isNaN(xvmLatestBlockNumber)) {
             throw new Error(`get xvmLatestBlockNumber error`)
         }
+        let _logIndex = logIndex;
         const xvmCurrentBlockNumber = xvmLatestBlockNumber+1;
         const inscriptionHash = xvmCurrentBlockNumber.toString().padStart(64, '0')
         const txHashList: string[] = []
@@ -188,10 +189,11 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
                         xToAddress: xvmTo ?? '',
                         btcHash: inscriptionHash,
                         xvmHash: hash,
-                        logIndex
+                        logIndex:_logIndex
                     }
                     await this.hashMappingService.bindHash(executeTransactionMappingHash)
                     this.logger.log(`[${xvmCurrentBlockNumber}] ${ExecutionModeEnum.PreExecution} transaction execute success, action:${InscriptionActionEnum[command.action]}  hash: ${hash}`)
+                    _logIndex++;
                 }
 
                 try {
@@ -210,8 +212,6 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
                     this.logger.error("add preBroadcastTxItem failed")
                     throw error
                 }
-
-                logIndex++;
             }
         })
 

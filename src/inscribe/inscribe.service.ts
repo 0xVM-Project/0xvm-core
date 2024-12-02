@@ -166,17 +166,21 @@ export class InscribeService {
         );
 
         const preBroadcastTxItemList = await this.preBroadcastTxItem.find({
-          where: { id: preBroadcastTx.id },
+          where: { preExecutionId: preBroadcastTx.id },
         });
 
         if (preBroadcastTxItemList && preBroadcastTxItemList?.length > 0) {
           await this.hashMapping.update(
             {
               btcHash: In(
-                preBroadcastTxItemList?.map((_preBroadcastTxItem) =>
-                  _preBroadcastTxItem?.xvmBlockHeight
-                    ?.toString()
-                    .padStart(64, '0'),
+                Array.from(
+                  new Set(
+                    preBroadcastTxItemList?.map((_preBroadcastTxItem) =>
+                      _preBroadcastTxItem?.xvmBlockHeight
+                        ?.toString()
+                        .padStart(64, '0'),
+                    ),
+                  ),
                 ),
               ),
             },
