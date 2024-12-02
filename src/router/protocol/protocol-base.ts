@@ -1,11 +1,12 @@
-import { ExecutionModeEnum } from "../interface/protocol.interface";
+import { CommandsV1Type, ExecutionModeEnum } from "../interface/protocol.interface";
 import { IProtocol } from "../router.interface";
 
 export abstract class ProtocolBase<I, C> implements IProtocol<I, C> {
     abstract filterInscription(inscription: I): I | null
     abstract decodeInscription(inscriptionContent: string): Array<C>
     abstract encodeInscription(inscriptionArray: Array<C>): string | null
-    abstract executeTransaction(inscription: I, executionMode?: ExecutionModeEnum): Promise<Array<string>>
+    abstract syncExecuteTransaction(inscription: I): Promise<boolean>
+    abstract preExecuteTransaction(pendingTxId:number, commandList: CommandsV1Type[], logIndex:number): Promise<boolean>
     abstract prev(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string | null>
     abstract mineBlock(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string | null>
     abstract deploy(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string | null>

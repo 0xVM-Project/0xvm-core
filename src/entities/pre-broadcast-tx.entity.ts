@@ -129,18 +129,6 @@ export class PreBroadcastTx {
   previous: string;
 
   @Column({
-    name: 'xvm_block_hash',
-    type: 'varchar',
-    length: 256,
-    nullable: false,
-    default: '',
-    charset: 'utf8mb4',
-    collation: 'utf8mb4_general_ci',
-  })
-  @Index()
-  xvmBlockHash: string;
-
-  @Column({
     name: 'reveal_hash',
     type: 'varchar',
     length: 256,

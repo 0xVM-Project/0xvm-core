@@ -11,10 +11,7 @@ import { XvmService } from 'src/xvm/xvm.service';
 import { Repository, MoreThan } from 'typeorm';
 import { SequencerService } from './sequencer/sequencer.service';
 import { Inscription } from 'src/ord/inscription.service';
-import { CommandsV1Type } from 'src/router/interface/protocol.interface';
-import { PreBroadcastTxItem } from 'src/entities/pre-broadcast-tx-item.entity';
 import { LastConfig } from 'src/entities/last-config.entity';
-import { PendingTx } from 'src/entities/pending-tx.entity';
 
 @Injectable()
 export class CoreService {
@@ -28,16 +25,12 @@ export class CoreService {
     constructor(
         @Inject(defaultConfig.KEY) private readonly defaultConf: ConfigType<typeof defaultConfig>,
         @InjectRepository(LastConfig) private readonly lastConfig: Repository<LastConfig>,
-        @InjectRepository(PreBroadcastTxItem)
-        private readonly preBroadcastTxItem: Repository<PreBroadcastTxItem>,
         private readonly indexerService: IndexerService,
         private readonly routerService: RouterService,
         private readonly xvmService: XvmService,
         private readonly preExecutionService: PreExecutionService,
         @InjectRepository(BtcHistoryTx, 'sqlite') private btcHistoryTxRepository: Repository<BtcHistoryTx>,
         private readonly sequencerService: SequencerService,
-        @InjectRepository(PendingTx)
-        private readonly pendingTx: Repository<PendingTx>,
     ) {
         this.firstInscriptionBlockHeight = this.defaultConf.xvm.firstInscriptionBlockHeight
         this.syncStatus = {
@@ -137,8 +130,8 @@ export class CoreService {
                     content: record.content,
                     hash: record.hash
                 }
-                const hashList = await this.routerService.from(inscription.content).executeTransaction(inscription)
-                this.logger.log(`Sync tx execution ${hashList.length} for ${record.blockHeight}`)
+                const executeResult = await this.routerService.from(inscription.content).syncExecuteTransaction(inscription)
+                this.logger.log(`Sync tx execution ${executeResult ? "success" : "failed"} for ${record.blockHeight}`)
                 // normal tx mine block
                 if (!isPrecompute) {
                     // Update the status to ensure whether a block needs to be produced
@@ -176,7 +169,6 @@ export class CoreService {
 
     async consumerMQ() {
         while (!this.isExecutionTaskStop) {
-            this.logger.debug(`this.messageQueue: ${JSON.stringify(this.messageQueue)}`)
             while (this.messageQueue?.length > 0) {
                 const mq = this.messageQueue.shift();
 
@@ -232,7 +224,7 @@ export class CoreService {
             const btcLatestBlockNumber = await this.indexerService.getLatestBlockNumberForBtc();
             const currentBtcBlockHeight = lastBtcBlockHeight + 1;
 
-            if (btcLatestBlockNumber) {
+            if (!isNaN(btcLatestBlockNumber)) {
                 // when online btc block height bigger than last btc block height
                 if (btcLatestBlockNumber > lastBtcBlockHeight) {
                     let retryTotal = 0
@@ -287,50 +279,28 @@ export class CoreService {
         const { inscriptionList, blockTimestamp } = await this.indexerService.fetchNormalInscription0xvmByBlock(currentBlockNumber);
         this.logger.log(`normalExecution: ${currentBlockNumber}/${btcLatestBlockNumber}, inscriptions-number: ${inscriptionList?.length ?? 0}`)
         // get latest xvm block height
-        const xvmLatestBlockNumber = await this.xvmService.getLatestBlockNumber();
         let lastTxHash: string = '';
-        if (!isNaN(xvmLatestBlockNumber) && inscriptionList && inscriptionList?.length > 0) {
-            let decodeInscriptionList: CommandsV1Type[] = []
-
+        if (blockTimestamp && inscriptionList && inscriptionList?.length > 0) {
             for (let index = 0; index < inscriptionList.length; index++) {
                 const inscription = inscriptionList[index]
                 const protocol = this.routerService.from(inscription.content)
                 // execute transaction from inscription content
-                const _hashList = await protocol.executeTransaction(inscription)
-
-                if (_hashList && _hashList?.length > 0) {
-                    lastTxHash = inscription.hash;
-                    // decode inscription content to transactions
-                    decodeInscriptionList = decodeInscriptionList.concat(protocol.decodeInscription(inscription.content) as CommandsV1Type[]);
-                }
+                await protocol.syncExecuteTransaction(inscription)
+                lastTxHash = inscription.hash ?? "";
             }
 
-            if (decodeInscriptionList && decodeInscriptionList?.length > 0) {
-                // mineBlock
-                const minterBlockHash = await this.xvmService.minterBlock(blockTimestamp);
-                this.logger.log(`Precompute Inscription Generate Block ${currentBlockNumber} is ${minterBlockHash}`);
+            // mineBlock
+            const minterBlockHash = await this.xvmService.minterBlock(blockTimestamp);
+            this.logger.log(`Precompute Inscription Generate Block ${currentBlockNumber} is ${minterBlockHash}`);
 
-                // save decoded transactions
-                await this.preBroadcastTxItem.save(
-                    this.preBroadcastTxItem.create(
-                        decodeInscriptionList.map((_decodeInscriptionItem) => ({
-                            action: _decodeInscriptionItem.action,
-                            data: _decodeInscriptionItem.data ?? "",
-                            // set current btc block height as xvmBlockHeight for hashMapping
-                            xvmBlockHeight: xvmLatestBlockNumber + 1
-                        })),
-                    ),
-                );
-
-                try {
-                    if (lastTxHash) {
-                        // update lastTxHash
-                        await this.lastConfig.update({}, { lastTxHash })
-                    }
-                } catch (error) {
-                    this.logger.error("update lastTxHsh failed")
-                    throw error
+            try {
+                if (lastTxHash) {
+                    // update lastTxHash
+                    await this.lastConfig.update({}, { lastTxHash })
                 }
+            } catch (error) {
+                this.logger.error("update lastTxHsh failed")
+                throw error
             }
         }
     }

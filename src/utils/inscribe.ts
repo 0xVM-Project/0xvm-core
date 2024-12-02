@@ -227,27 +227,3 @@ async function checkCommitTx(tx: string, amount: number, payAddress: string) {
     throw new Error('Commit inscribe param error, invalid tx');
   }
 }
-
-export async function checkIsChunked(hash?: string) {
-  if (hash) {
-    const url = `https://open-api-testnet.unisat.io/v1/indexer/tx/${hash}`;
-
-    const response: { data: { data: { confirmations: number } } } =
-      await axios.get(url, {
-        headers: {
-          accept: 'application/json',
-          Authorization: `Bearer ${process.env.UNISAT_API_KEY || ''}`,
-        },
-      });
-
-    return Boolean(
-      response &&
-        response?.data &&
-        response?.data?.data &&
-        response?.data?.data?.confirmations &&
-        response?.data?.data?.confirmations > 0,
-    );
-  }
-
-  return false;
-}

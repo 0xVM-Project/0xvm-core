@@ -42,44 +42,44 @@ describe('ProtocolService', () => {
     expect(service).toBeDefined();
   });
 
-  it('deploy command', async () => {
-    const inscriptionContent = '0f0001DAAAAAAABgAIAAQABgAAAAQAAAABAAAADAAAAAgADAAIAAQACAAAAAgAAAACAAAA2gAAADB4Zjg2YTgwODQxZGNkNjUwMDgyNTIwODk0NjEzOTJmNDk4ZDc3Zjg0NzRlZjdkZDhhZTc0MzM1N2Y5OGE3MjNlYzg3MWZmOTczY2FmYTgwMDA4MDFjYTA5MzE2MmY2MGVmYmYzYzFjYTNhNGNmMzM0NjU2NmEzOTZkZTRiZGU4YWY5ODQyNzMwM2UwODk5MzMxNjJkMjU4YTAzNjRmNzhkODZiYWYzYTJmZmE3NGYwZDQxOWU0NWM2ZTI1ZDZiNzJlNTc5NTdhYjU5NjA3ODRmNDE2YWFlNmE0AAA='
-    const inscription = {
-      inscriptionId: 'ba6307750d57b99a5ffa0bac2b1fd7efc5953d8f094bf56bcbd298c5e621a61bi0',
-      contentType: '',
-      contentLength: inscriptionContent.length,
-      content: inscriptionContent,
-      hash: 'ba6307750d57b99a5ffa0bac2b1fd7efc5953d8f094bf56bcbd298c5e621a61b'
-    }
-    const txHashList = await service.from(inscriptionContent).executeTransaction(inscription)
-    console.log(`txHashList:${JSON.stringify(txHashList, null, 2)}`)
-  })
+  // it('deploy command', async () => {
+  //   const inscriptionContent = '0f0001DAAAAAAABgAIAAQABgAAAAQAAAABAAAADAAAAAgADAAIAAQACAAAAAgAAAACAAAA2gAAADB4Zjg2YTgwODQxZGNkNjUwMDgyNTIwODk0NjEzOTJmNDk4ZDc3Zjg0NzRlZjdkZDhhZTc0MzM1N2Y5OGE3MjNlYzg3MWZmOTczY2FmYTgwMDA4MDFjYTA5MzE2MmY2MGVmYmYzYzFjYTNhNGNmMzM0NjU2NmEzOTZkZTRiZGU4YWY5ODQyNzMwM2UwODk5MzMxNjJkMjU4YTAzNjRmNzhkODZiYWYzYTJmZmE3NGYwZDQxOWU0NWM2ZTI1ZDZiNzJlNTc5NTdhYjU5NjA3ODRmNDE2YWFlNmE0AAA='
+  //   const inscription = {
+  //     inscriptionId: 'ba6307750d57b99a5ffa0bac2b1fd7efc5953d8f094bf56bcbd298c5e621a61bi0',
+  //     contentType: '',
+  //     contentLength: inscriptionContent.length,
+  //     content: inscriptionContent,
+  //     hash: 'ba6307750d57b99a5ffa0bac2b1fd7efc5953d8f094bf56bcbd298c5e621a61b'
+  //   }
+  //   const txHashList = await service.from(inscriptionContent).executeTransaction(inscription)
+  //   console.log(`txHashList:${JSON.stringify(txHashList, null, 2)}`)
+  // })
 
-  it('invalid deposit command', async () => {
-    const inscriptionContent = '0f0001DAAAAAAABgAIAAQABgAAAAQAAAABAAAADAAAAAgADAAIAAQACAAAAAgAAAAEAAAAmAAAADB4Zjg0OTgwODA4MDgwODA4MDFjYTBhY2M2OTI3MjJkYWViYjZhYWE0MmY0OTU5NzlmN2IzNzk1Mzc2NTFmZjkzMTcxYTBiODI1ZDA0MTllNzcxYmMzYTA0MWJjNWZmNzZhZGIxODA0NTFlYTQ5N2Y3OWMyMWE4MGM5MmIzYjVlODFlNTI5NTY5MzZmMjczODI3MTE2NTFlAAAAAA=='
-    const inscription = {
-      inscriptionId: 'f5bae178e3ec56de4c2c26d2b0fea6aab2ef0a3ad5cb6c177772722133cdcea5i0',
-      contentType: '',
-      contentLength: inscriptionContent.length,
-      content: inscriptionContent,
-      hash: 'f5bae178e3ec56de4c2c26d2b0fea6aab2ef0a3ad5cb6c177772722133cdcea5'
-    }
-    const txHashList = await service.from(inscriptionContent).executeTransaction(inscription)
-    console.log(`txHashList:${JSON.stringify(txHashList, null, 2)}`)
-  })
+  // it('invalid deposit command', async () => {
+  //   const inscriptionContent = '0f0001DAAAAAAABgAIAAQABgAAAAQAAAABAAAADAAAAAgADAAIAAQACAAAAAgAAAAEAAAAmAAAADB4Zjg0OTgwODA4MDgwODA4MDFjYTBhY2M2OTI3MjJkYWViYjZhYWE0MmY0OTU5NzlmN2IzNzk1Mzc2NTFmZjkzMTcxYTBiODI1ZDA0MTllNzcxYmMzYTA0MWJjNWZmNzZhZGIxODA0NTFlYTQ5N2Y3OWMyMWE4MGM5MmIzYjVlODFlNTI5NTY5MzZmMjczODI3MTE2NTFlAAAAAA=='
+  //   const inscription = {
+  //     inscriptionId: 'f5bae178e3ec56de4c2c26d2b0fea6aab2ef0a3ad5cb6c177772722133cdcea5i0',
+  //     contentType: '',
+  //     contentLength: inscriptionContent.length,
+  //     content: inscriptionContent,
+  //     hash: 'f5bae178e3ec56de4c2c26d2b0fea6aab2ef0a3ad5cb6c177772722133cdcea5'
+  //   }
+  //   const txHashList = await service.from(inscriptionContent).executeTransaction(inscription)
+  //   console.log(`txHashList:${JSON.stringify(txHashList, null, 2)}`)
+  // })
 
-  it('deposit command', async () => {
-    const inscriptionContent = '0f0001DAAAAAAABgAIAAQABgAAAAQAAAABAAAADAAAAAgADAAIAAQACAAAAAgAAAAEAAAAxgAAADB4Zjg2MDgwODA4MDk0OTA0YjBlZDIzZWU1ZWUwMzg2ODBhMTI4YzBkMGQwMGYxNjE4YWNmMzgzMGY0MjQwODAxY2EwNWQwN2U0ODFlMzE3ZTdmNDA1YmUyYzQ4ZmM5NGQwMTFhMDBmM2ViMDBhNTIyZTE1MzQ3OTFhMjMwYzMxNjk0N2EwNjY3ZTVmZDBjNTNjNGMxYTc2M2UzZDMwYWYzODQ3YzQ3NTc5MTFiMWQ4YzE4MGQyMzU1Y2E2Nzc2MzJlMDI3YwAA'
-    const inscription = {
-      inscriptionId: '6e25fcb8ca01f63203de7b2e568d87a1bb198c427d5edf67d6f0f7494b377113i0',
-      contentType: '',
-      contentLength: inscriptionContent.length,
-      content: inscriptionContent,
-      hash: '6e25fcb8ca01f63203de7b2e568d87a1bb198c427d5edf67d6f0f7494b377113'
-    }
-    const txHashList = await service.from(inscriptionContent).executeTransaction(inscription)
-    console.log(`txHashList:${JSON.stringify(txHashList, null, 2)}`)
-  })
+  // it('deposit command', async () => {
+  //   const inscriptionContent = '0f0001DAAAAAAABgAIAAQABgAAAAQAAAABAAAADAAAAAgADAAIAAQACAAAAAgAAAAEAAAAxgAAADB4Zjg2MDgwODA4MDk0OTA0YjBlZDIzZWU1ZWUwMzg2ODBhMTI4YzBkMGQwMGYxNjE4YWNmMzgzMGY0MjQwODAxY2EwNWQwN2U0ODFlMzE3ZTdmNDA1YmUyYzQ4ZmM5NGQwMTFhMDBmM2ViMDBhNTIyZTE1MzQ3OTFhMjMwYzMxNjk0N2EwNjY3ZTVmZDBjNTNjNGMxYTc2M2UzZDMwYWYzODQ3YzQ3NTc5MTFiMWQ4YzE4MGQyMzU1Y2E2Nzc2MzJlMDI3YwAA'
+  //   const inscription = {
+  //     inscriptionId: '6e25fcb8ca01f63203de7b2e568d87a1bb198c427d5edf67d6f0f7494b377113i0',
+  //     contentType: '',
+  //     contentLength: inscriptionContent.length,
+  //     content: inscriptionContent,
+  //     hash: '6e25fcb8ca01f63203de7b2e568d87a1bb198c427d5edf67d6f0f7494b377113'
+  //   }
+  //   const txHashList = await service.from(inscriptionContent).executeTransaction(inscription)
+  //   console.log(`txHashList:${JSON.stringify(txHashList, null, 2)}`)
+  // })
   it('deposit command parse', async () => {
     const inscriptionContent = '0f0001DAAAAAAABgAIAAQABgAAAAQAAAABAAAADAAAAAgADAAIAAQACAAAAAgAAAAEAAAAxgAAADB4Zjg2MDgwODA4MDk0OTA0YjBlZDIzZWU1ZWUwMzg2ODBhMTI4YzBkMGQwMGYxNjE4YWNmMzgzMGY0MjQwODAxY2EwNWQwN2U0ODFlMzE3ZTdmNDA1YmUyYzQ4ZmM5NGQwMTFhMDBmM2ViMDBhNTIyZTE1MzQ3OTFhMjMwYzMxNjk0N2EwNjY3ZTVmZDBjNTNjNGMxYTc2M2UzZDMwYWYzODQ3YzQ3NTc5MTFiMWQ4YzE4MGQyMzU1Y2E2Nzc2MzJlMDI3YwAA'
     const command = service.from(inscriptionContent).decodeInscription(inscriptionContent)

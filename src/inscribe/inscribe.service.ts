@@ -9,10 +9,12 @@ import { HashMapping } from 'src/entities/hash-mapping.entity';
 import { LastConfig } from 'src/entities/last-config.entity';
 import { PreBroadcastTxItem } from 'src/entities/pre-broadcast-tx-item.entity';
 import { PreBroadcastTx } from 'src/entities/pre-broadcast-tx.entity';
+import { InscriptionActionEnum } from 'src/indexer/indexer.enum';
 import { IndexerService } from 'src/indexer/indexer.service';
-import { RouterService } from 'src/router/router.service';
+import { HashMappingService } from 'src/router/protocol/hash-mapping/hash-mapping.service';
 import { BTCTransaction } from 'src/utils/btc-transaction';
 import { createCommit, createReveal, relay } from 'src/utils/inscribe';
+import { XvmService } from 'src/xvm/xvm.service';
 import { In, Repository } from 'typeorm';
 import { FeeRate, UnisatResponse } from './inscribe.interface';
 
@@ -28,15 +30,16 @@ export class InscribeService {
     private readonly preBroadcastTx: Repository<PreBroadcastTx>,
     @InjectRepository(LastConfig)
     private readonly lastConfig: Repository<LastConfig>,
-    @InjectRepository(HashMapping)
-    private readonly hashMappingRepository: Repository<HashMapping>,
     @InjectRepository(PreBroadcastTxItem)
     private readonly preBroadcastTxItem: Repository<PreBroadcastTxItem>,
     @Inject(defaultConfig.KEY)
     private readonly defaultConf: ConfigType<typeof defaultConfig>,
     private readonly httpService: HttpService,
-    private readonly routerService: RouterService,
     private readonly indexerService: IndexerService,
+    private readonly xvmService: XvmService,
+    private readonly hashMappingService: HashMappingService,
+    @InjectRepository(HashMapping)
+    private readonly hashMapping: Repository<HashMapping>,
   ) {
     const operatorPrivateKey = this.defaultConf.xvm.operatorPrivateKey;
     this.feeRate = this.defaultConf.wallet.btcFeeRate;
@@ -50,57 +53,41 @@ export class InscribeService {
   }
 
   async create(preBroadcastTx: PreBroadcastTx, feeRate: number) {
-    const preBroadcastTxList = await this.preBroadcastTxItem.find({
-      where: { preExecutionId: preBroadcastTx.id },
-    });
+    const content = preBroadcastTx?.content;
 
-    if (preBroadcastTxList && preBroadcastTxList.length > 0) {
-      const content = this.routerService.from('0f0001').encodeInscription(
-        preBroadcastTxList?.map((_preBroadcastTxItem) => ({
-          action: _preBroadcastTxItem?.action,
-          data: _preBroadcastTxItem?.data,
-        })),
+    if (content) {
+      const receiverAddress = this.defaultConf.wallet.fundingAddress;
+      const { payPrivateKey, payAddress, amount } = await createCommit(
+        content,
+        receiverAddress,
+        feeRate,
       );
 
-      if (content) {
-        const receiverAddress = this.defaultConf.wallet.fundingAddress;
-        const { payPrivateKey, payAddress, amount } = await createCommit(
-          content,
-          receiverAddress,
-          feeRate,
+      const inscribeId = crypto.randomUUID();
+
+      try {
+        await this.preBroadcastTx.update(
+          { id: preBroadcastTx.id },
+          {
+            status: 2,
+            inscribeId,
+            privateKey: payPrivateKey,
+            content,
+            receiverAddress,
+            feeRate,
+            amount,
+            temporaryAddress: payAddress,
+          },
         );
-
-        const inscribeId = crypto.randomUUID();
-
-        try {
-          await this.preBroadcastTx.update(
-            { id: preBroadcastTx.id },
-            {
-              status: 2,
-              inscribeId,
-              privateKey: payPrivateKey,
-              content: content,
-              receiverAddress,
-              feeRate,
-              amount,
-              temporaryAddress: payAddress,
-            },
-          );
-        } catch (error) {
-          this.logger.error('update preBroadcastTx failed');
-          throw error;
-        }
-
-        const newPreBroadcastTx = await this.preBroadcastTx.findOne({
-          where: { id: preBroadcastTx.id },
-        });
-        await this.transfer(newPreBroadcastTx);
+      } catch (error) {
+        this.logger.error('update preBroadcastTx failed');
+        throw error;
       }
-    } else {
-      await this.preBroadcastTx.update(
-        { id: preBroadcastTx?.id },
-        { status: 0 },
-      );
+
+      const newPreBroadcastTx = await this.preBroadcastTx.findOne({
+        where: { id: preBroadcastTx.id },
+      });
+      await this.transfer(newPreBroadcastTx);
     }
   }
 
@@ -154,14 +141,23 @@ export class InscribeService {
       try {
         await relay(preBroadcastTx.commitTx);
         await relay(revealResult.signedTx);
+
+        const lastConfig = await this.lastConfig.find({
+          take: 1,
+          order: {
+            id: 'ASC',
+          },
+        });
+
         await this.preBroadcastTx.update(
           { id: preBroadcastTx.id },
           {
             revealHash: revealResult.txHash,
             status: 4,
-            previous: revealResult.txHash,
+            previous: lastConfig?.[0]?.lastTxHash ?? '',
           },
         );
+
         this.lastConfig.update(
           {},
           {
@@ -169,29 +165,53 @@ export class InscribeService {
           },
         );
 
-        const preBroadcastTxList = await this.preBroadcastTxItem.find({
+        const preBroadcastTxItemList = await this.preBroadcastTxItem.find({
           where: { id: preBroadcastTx.id },
         });
 
-        if (preBroadcastTxList && preBroadcastTxList?.length > 0) {
-          const xvmBlockHeightList = [];
+        if (preBroadcastTxItemList && preBroadcastTxItemList?.length > 0) {
+          await this.hashMapping.update(
+            {
+              btcHash: In(
+                preBroadcastTxItemList?.map((_preBroadcastTxItem) =>
+                  _preBroadcastTxItem?.xvmBlockHeight
+                    ?.toString()
+                    .padStart(64, '0'),
+                ),
+              ),
+            },
+            {
+              btcHash: revealResult.txHash,
+            },
+          );
 
-          preBroadcastTxList.forEach((_preBroadcastTxItem) => {
-            if (
-              !xvmBlockHeightList.includes(_preBroadcastTxItem?.xvmBlockHeight)
-            ) {
-              xvmBlockHeightList.push(
-                `0x${_preBroadcastTxItem?.xvmBlockHeight
-                  ?.toString()
-                  .padStart(64, '0')}`,
+          const toRewards = this.defaultConf.xvm.sysXvmAddress;
+          const rewardResponse =
+            await this.xvmService.rewardsTransfer(toRewards);
+
+          if ('result' in rewardResponse) {
+            const rewardHash = rewardResponse.result;
+
+            if (rewardHash) {
+              await this.hashMappingService.bindHash({
+                xFromAddress: toRewards,
+                xToAddress: toRewards,
+                btcHash: revealResult.txHash,
+                xvmHash: rewardHash,
+                logIndex:
+                  preBroadcastTxItemList?.filter(
+                    (_item) =>
+                      _item?.action &&
+                      _item?.action !== InscriptionActionEnum.mineBlock,
+                  )?.length ?? 0,
+              });
+              this.logger.log(
+                `inscribe Send Inscription Rewards[546*(10^8)] success, hash: ${rewardHash}`,
               );
             }
-          });
-
-          if (xvmBlockHeightList && xvmBlockHeightList?.length > 0) {
-            await this.hashMappingRepository.update(
-              { btcHash: In(xvmBlockHeightList) },
-              { btcHash: revealResult.txHash },
+          } else {
+            this.logger.warn(
+              `inscribe rewards failed. Caused by: ${JSON.stringify(rewardResponse?.error)}`,
             );
           }
         }
@@ -300,7 +320,7 @@ export class InscribeService {
           await this.indexerService.getLatestBlockNumberForBtc();
 
         return Boolean(
-          btcLatestBlockNumber &&
+          !isNaN(btcLatestBlockNumber) &&
             utxos?.every(
               (utxo) => utxo?.height && utxo?.height <= btcLatestBlockNumber,
             ),

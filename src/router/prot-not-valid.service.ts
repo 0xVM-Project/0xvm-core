@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ProtocolBase } from './protocol/protocol-base';
 import { Inscription } from 'src/ord/inscription.service';
-import { BaseCommandsType, ExecutionModeEnum } from './interface/protocol.interface';
+import { BaseCommandsType, CommandsV1Type, ExecutionModeEnum } from './interface/protocol.interface';
 
 @Injectable()
 export class ProtNotValidService extends ProtocolBase<Inscription, BaseCommandsType> {
@@ -13,8 +13,12 @@ export class ProtNotValidService extends ProtocolBase<Inscription, BaseCommandsT
         return []
     }
 
-    async executeTransaction(inscription: any,executionMode: ExecutionModeEnum): Promise<Array<string>> {
-        return []
+    async syncExecuteTransaction(inscription: any): Promise<boolean> {
+        return false
+    }
+
+    async preExecuteTransaction(pendingTxId:number, commandList: CommandsV1Type[], logIndex:number): Promise<boolean> {
+        return false
     }
 
     encodeInscription(inscription: any): string | null {

@@ -171,6 +171,7 @@ export class XvmService {
     }
 
     unSignTransaction(signTransaction: string): Transaction | null {
+        console.debug(`signTransaction: ${JSON.stringify(signTransaction)}`)
         if (!signTransaction) {
             this.logger.warn(`signTransaction not is empty`)
             return null

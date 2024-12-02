@@ -44,6 +44,17 @@ export class PreBroadcastTxItem {
   type: number;
 
   @Column({
+    name: 'status',
+    type: 'tinyint',
+    nullable: false,
+    default: 0,
+    unsigned: true,
+    comment: '0: execute failed 1: execute successful 2: chucked',
+  })
+  @Index()
+  status: number;
+
+  @Column({
     name: 'action',
     type: 'tinyint',
     nullable: false,

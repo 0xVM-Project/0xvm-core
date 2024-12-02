@@ -1,9 +1,10 @@
-import { ExecutionModeEnum } from "./interface/protocol.interface"
+import { CommandsV1Type, ExecutionModeEnum } from "./interface/protocol.interface"
 
 export interface IProtocol<I, C> {
     filterInscription(inscriptions: I): I | null
     decodeInscription(inscriptionContent: string): Array<C>
-    executeTransaction(inscription: I, executionMode?: ExecutionModeEnum): Promise<Array<string>>
+    syncExecuteTransaction(inscription: I): Promise<boolean>
+    preExecuteTransaction(pendingTxId:number, commandList: CommandsV1Type[], logIndex:number): Promise<boolean>
     encodeInscription(inscriptionArray: Array<C>): string | null
 
     /** protocol action

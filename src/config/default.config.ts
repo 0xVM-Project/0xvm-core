@@ -27,6 +27,7 @@ export default registerAs('defalut', () => ({
     wallet: {
         fundingAddress: process.env.FUNDING_ADDRESS ?? '',
         walletApiUrl: removeTrailingSlash(process.env.WALLET_API_URL ?? ''),
-        btcFeeRate: process.env.BTC_FEE_RATE ? Number(process.env.BTC_FEE_RATE) : 50
+        btcFeeRate: process.env.BTC_FEE_RATE ? Number(process.env.BTC_FEE_RATE) : 50,
+        InscribeMaxSize: process.env.INSCRIBE_MAX_SIZE ? Number(process.env.INSCRIBE_MAX_SIZE) : 1000000
     }
 }))

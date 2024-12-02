@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ProtocolVersionEnum } from '../router.enum';
-import { BaseCommandsType, CommandsV1Type, ExecutionModeEnum } from '../interface/protocol.interface'
+import { CommandsV1Type, ExecutionModeEnum } from '../interface/protocol.interface'
 import { InscriptionActionEnum } from 'src/indexer/indexer.enum';
 import * as Flatbuffers from "./flatbuffers/output/zxvm";
 import * as flatbuffers from "flatbuffers";
@@ -13,9 +13,11 @@ import { OrdService } from 'src/ord/ord.service';
 import { Inscription } from 'src/ord/inscription.service';
 import { ProtocolBase } from './protocol-base';
 import { BtcrpcService } from 'src/common/api/btcrpc/btcrpc.service';
-import { inspect } from 'util';
 import { capitalizeFirstLetter } from 'src/utils/str.utils';
 import { HashMappingInterface } from './hash-mapping/hash.interface';
+import { PreBroadcastTxItem } from 'src/entities/pre-broadcast-tx-item.entity';
+import { Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 
 
 @Injectable()
@@ -29,6 +31,8 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         private readonly hashMappingService: HashMappingService,
         private readonly ordService: OrdService,
         private readonly btcrpcService: BtcrpcService,
+        @InjectRepository(PreBroadcastTxItem)
+        private readonly preBroadcastTxItem: Repository<PreBroadcastTxItem>,
     ) {
         super()
     }
@@ -90,7 +94,11 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         return await headers[actionEnum](command.data, inscriptionHash, executionMode)
     }
 
-    async syncExecuteTransaction(inscription: Inscription): Promise<Array<string>> {
+    async syncExecuteTransaction(inscription: Inscription): Promise<boolean> {
+        const xvmLatestBlockNumber = await this.xvmService.getLatestBlockNumber();
+        if (!xvmLatestBlockNumber || isNaN(xvmLatestBlockNumber)) {
+            throw new Error(`get xvmLatestBlockNumber error`)
+        }
         if (!inscription?.content || !inscription?.inscriptionId) {
             throw new Error(`Inscription content or inscription id cannot be empty`)
         }
@@ -104,7 +112,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         for (let index = 0; index < inscriptionCommandList.length; index++) {
             const command = inscriptionCommandList[index];
             const hash = await this.commandExecution(command, inscription.hash, ExecutionModeEnum.Normal)
-            // todo code
+            
             if (hash) {
                 transactionHash.push(hash)
                 const unsingTransaction = this.xvmService.unSignTransaction(command.data)
@@ -123,48 +131,21 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
                 logIndex += 1
                 this.logger.log(`[${inscription.blockHeight}] ${ExecutionModeEnum.Normal} transaction execute success, action:${InscriptionActionEnum[command.action]}  hash: ${hash}`)
             }
-        }
-        // inscription rewards
-        if (!inscriptionSignAddressList.every((item) => item === inscriptionSignAddressList[0])) {
-            this.logger.warn(`Inscription command have multiple signature addresses, Inscription Hash: ${inscription.hash}`)
-        }
-        const rewardReceiveAddress = inscriptionSignAddressList.at(0)
-        await this.inscriptionRewards(rewardReceiveAddress, inscription.hash)
-        return transactionHash
-    }
 
-    async preExecuteTransaction(inscription: Inscription) {
-        if (!inscription?.content || !inscription?.inscriptionId) {
-            throw new Error(`Inscription content or inscription id cannot be empty`)
-        }
-        if (inscription.inscriptionId.length != 66) {
-            throw new Error(`Invalid inscription id, length must be 64, currently ${inscription.inscriptionId?.length}`)
-        }
-        const transactionHash: string[] = []
-        const inscriptionCommandList = this.decodeInscription(inscription.content)
-        const inscriptionSignAddressList: string[] = []
-        let logIndex = 0
-        for (let index = 0; index < inscriptionCommandList.length; index++) {
-            const command = inscriptionCommandList[index];
-            const hash = await this.commandExecution(command, inscription.hash, ExecutionModeEnum.PreExecution)
-            // todo code
-            if (hash) {
-                transactionHash.push(hash)
-                const unsingTransaction = this.xvmService.unSignTransaction(command.data)
-                const xvmFrom = unsingTransaction.from
-                const xvmTo = unsingTransaction.to
-                unsingTransaction && inscriptionSignAddressList.push(xvmFrom)
-                const executeTransactionMappingHash: HashMappingInterface = {
-                    xFromAddress: xvmFrom ?? '',
-                    xToAddress: xvmTo ?? '',
-                    btcHash: inscription.hash,
-                    xvmHash: hash,
-                    logIndex: logIndex
-                }
-                // hash mapping
-                await this.hashMappingService.bindHash(executeTransactionMappingHash)
-                logIndex += 1
-                this.logger.log(`[${inscription.blockHeight}] ${ExecutionModeEnum.PreExecution} transaction execute success, action:${InscriptionActionEnum[command.action]}  hash: ${hash}`)
+            try {
+                await this.preBroadcastTxItem.save(
+                    this.preBroadcastTxItem.create({
+                        type: 1,
+                        action: command.action ?? 0,
+                        data: command.data ?? "",
+                        // set current btc block height as xvmBlockHeight for hashMapping
+                        xvmBlockHeight: xvmLatestBlockNumber + 1,
+                        status: hash ? 1: 0
+                    }),
+                );
+            } catch (error) {
+                this.logger.error("add preBroadcastTxItem failed")
+                throw error
             }
         }
         // inscription rewards
@@ -172,16 +153,69 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
             this.logger.warn(`Inscription command have multiple signature addresses, Inscription Hash: ${inscription.hash}`)
         }
         const rewardReceiveAddress = inscriptionSignAddressList.at(0)
-        await this.inscriptionRewards(rewardReceiveAddress, inscription.hash, ExecutionModeEnum.PreExecution)
-        return transactionHash
+        await this.inscriptionRewards(rewardReceiveAddress, inscription.hash)
+        return transactionHash?.every(_item => Boolean(_item))
     }
 
-    async executeTransaction(inscription: Inscription, executionMode: ExecutionModeEnum = ExecutionModeEnum.Normal): Promise<Array<string>> {
-        if (executionMode === ExecutionModeEnum.Normal) {
-            return await this.syncExecuteTransaction(inscription)
-        } else {
-            return await this.preExecuteTransaction(inscription)
+    async preExecuteTransaction(pendingTxId:number, commandList: CommandsV1Type[], logIndex:number) {
+        if(!commandList || !commandList?.length){
+            return false
         }
+        
+        const xvmLatestBlockNumber = await this.xvmService.getLatestBlockNumber();
+        if (isNaN(xvmLatestBlockNumber)) {
+            throw new Error(`get xvmLatestBlockNumber error`)
+        }
+        const xvmCurrentBlockNumber = xvmLatestBlockNumber+1;
+        const inscriptionHash = xvmCurrentBlockNumber.toString().padStart(64, '0')
+        const txHashList: string[] = []
+
+        commandList?.map(async(command) => {
+            let hash = "";
+            const commandAction = command?.action;
+            const commandData = command?.data;
+
+            if(commandAction && commandAction !== InscriptionActionEnum.mineBlock && commandData){
+                hash = await this.commandExecution(command, inscriptionHash, ExecutionModeEnum.PreExecution);
+
+                if (hash) {
+                    txHashList.push(hash);
+                    const unsingTransaction = this.xvmService.unSignTransaction(command.data);
+                    const xvmFrom = unsingTransaction.from;
+                    const xvmTo = unsingTransaction.to;
+                    const executeTransactionMappingHash: HashMappingInterface = {
+                        xFromAddress: xvmFrom ?? '',
+                        xToAddress: xvmTo ?? '',
+                        btcHash: inscriptionHash,
+                        xvmHash: hash,
+                        logIndex
+                    }
+                    await this.hashMappingService.bindHash(executeTransactionMappingHash)
+                    this.logger.log(`[${xvmCurrentBlockNumber}] ${ExecutionModeEnum.PreExecution} transaction execute success, action:${InscriptionActionEnum[command.action]}  hash: ${hash}`)
+                }
+
+                try {
+                    await this.preBroadcastTxItem.save(
+                        this.preBroadcastTxItem.create({
+                            pendingTxId,
+                            type: 2,
+                            action: commandAction,
+                            data: commandData,
+                            // set current btc block height as xvmBlockHeight for hashMapping
+                            xvmBlockHeight: xvmCurrentBlockNumber,
+                            status: (hash || commandAction === InscriptionActionEnum.prev || commandAction === InscriptionActionEnum.mineBlock) ? 1: 0
+                        }),
+                    );
+                } catch (error) {
+                    this.logger.error("add preBroadcastTxItem failed")
+                    throw error
+                }
+
+                logIndex++;
+            }
+        })
+
+        return txHashList?.every(_item => Boolean(_item))
     }
 
     async mineBlock(data: string, inscriptionHash: string, executionMode: ExecutionModeEnum): Promise<string> {
@@ -200,7 +234,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
                 return response.result
             }
             const unSignTransaction = this.xvmService.unSignTransaction(data)
-            if (unSignTransaction && unSignTransaction.from.toLowerCase() == this.defaultConf.xvm.sysXvmAddress.toLowerCase()) {
+            if (unSignTransaction && unSignTransaction?.from?.toLowerCase() == this.defaultConf.xvm.sysXvmAddress.toLowerCase()) {
                 throw new Error(`[${formatAction}] ${formatAction} failed. Inscription Hash: ${inscriptionHash} sender: ${unSignTransaction.from} to: ${unSignTransaction.to}`)
             }
             this.logger.warn(`[${formatAction}] ${formatAction} Failed. Inscription Hash: ${inscriptionHash} Caused by:${JSON.stringify(response.error)}`)

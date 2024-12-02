@@ -9,10 +9,11 @@ import { BlockHashSnapshot } from 'src/entities/block-snapshot.entity';
 import { BtcHistoryTx } from 'src/entities/sqlite-entities/btc-history-tx.entity';
 import { SqliteModule } from 'src/common/sqlite/sqlite.module';
 import { BtcrpcModule } from 'src/common/api/btcrpc/btcrpc.module';
+import { PreBroadcastTxItem } from 'src/entities/pre-broadcast-tx-item.entity';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([BlockHashSnapshot]),
+        TypeOrmModule.forFeature([BlockHashSnapshot, PreBroadcastTxItem]),
         SqliteModule,
         HashMappingModule,
         XvmModule,

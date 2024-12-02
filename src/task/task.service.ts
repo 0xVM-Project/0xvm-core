@@ -16,31 +16,29 @@ export class TaskService {
     this.isInscribeRunning = false;
   }
 
-  // @Timeout(3000)
-  // async handleTimeout() {
-  //   try {
-  //     this.logger.log('Indexing service startup');
-  //     await this.coreService.run();
-  //   } catch (error) {
-  //     this.logger.error(error instanceof Error ? error.stack : error);
-  //   }
-  // }
+  @Timeout(3000)
+  async handleTimeout() {
+    try {
+      this.logger.log('Indexing service startup');
+      await this.coreService.run();
+    } catch (error) {
+      this.logger.error(error instanceof Error ? error.stack : error);
+    }
+  }
 
-  // @Interval('pre-execute', 10000)
-  // async handleExecute() {
-  //   try {
-  //     this.logger.debug(`pre-execute`)
-  //     this.logger.debug(`this.coreService.isExecutionTaskStop: ${JSON.stringify(this.coreService.isExecutionTaskStop)}`)
-  //     if (this.coreService.isExecutionTaskStop) {
-  //       const interval = this.schedulerRegistry.getInterval('pre-execute');
-  //       clearInterval(interval);
-  //     } else {
-  //       await this.coreService.chunkMQ();
-  //     }
-  //   } catch (error) {
-  //     this.logger.error(error instanceof Error ? error.stack : error);
-  //   }
-  // }
+  @Interval('pre-execute', 10000)
+  async handleExecute() {
+    try {
+      if (this.coreService.isExecutionTaskStop) {
+        const interval = this.schedulerRegistry.getInterval('pre-execute');
+        clearInterval(interval);
+      } else {
+        await this.coreService.chunkMQ();
+      }
+    } catch (error) {
+      this.logger.error(error instanceof Error ? error.stack : error);
+    }
+  }
 
   @Interval(10000)
   async handleInscribe() {

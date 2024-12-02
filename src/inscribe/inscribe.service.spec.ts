@@ -16,6 +16,10 @@ import { DataSource } from 'typeorm';
 import { InscribeService } from './inscribe.service';
 import { MysqlModule } from 'src/common/mysql/mysql.module';
 import { ethers } from 'ethers';
+import { IndexerModule } from 'src/indexer/indexer.module';
+import { BtcrpcModule } from 'src/common/api/btcrpc/btcrpc.module';
+import { XvmModule } from 'src/xvm/xvm.module';
+import { HashMappingModule } from 'src/router/protocol/hash-mapping/hash-mapping.module';
 
 jest.setTimeout(30000)
 
@@ -38,6 +42,10 @@ describe('InscribeService', () => {
         AxiosModule,
         RouterModule,
         MysqlModule,
+        IndexerModule,
+        BtcrpcModule,
+        XvmModule,
+        HashMappingModule,
         TypeOrmModule.forFeature([
           PreBroadcastTx,
           LastConfig,
@@ -64,32 +72,32 @@ describe('InscribeService', () => {
     expect(service).toBeDefined();
   });
 
-  // it('create signed inscription', async () => {
-  //   const defaultConf: ConfigType<typeof defaultConfig> = config.get('defalut');
-  //   console.log(defaultConf.xvm.sysPrivateKey);
-  //   const provider = new ethers.JsonRpcProvider(defaultConf.xvm.xvmRpcUrl);
-  //   const wallet = new ethers.Wallet(defaultConf.xvm.sysPrivateKey, provider);
+  it.only('create signed inscription', async () => {
+    const defaultConf: ConfigType<typeof defaultConfig> = config.get('defalut');
+    console.log(defaultConf.xvm.sysPrivateKey);
+    const provider = new ethers.JsonRpcProvider(defaultConf.xvm.xvmRpcUrl);
+    const wallet = new ethers.Wallet(defaultConf.xvm.sysPrivateKey, provider);
 
-  //   const gasFee = await provider.getFeeData();
+    const gasFee = await provider.getFeeData();
 
-  //   const transactionHex = await wallet.signTransaction({
-  //     to: '0xa7764B63d91810422F4D743b7907f469cB7a6D20',
-  //     value: 100,
-  //     chainId: 42,
-  //     gasPrice: gasFee.gasPrice,
-  //     gasLimit: 21000,
-  //     nonce: 1
-  //   });
-  //   console.log(transactionHex);
+    const transactionHex = await wallet.signTransaction({
+      to: '0xa7764B63d91810422F4D743b7907f469cB7a6D20',
+      value: 100,
+      chainId: 42,
+      gasPrice: gasFee.gasPrice,
+      gasLimit: 21000,
+      nonce: 2
+    });
+    console.log(transactionHex);
 
-  //   const commandTx = {
-  //     action: 3,
-  //     data: transactionHex as `0x${string}`,
-  //   };
+    const commandTx = {
+      action: 3,
+      data: transactionHex as `0x${string}`,
+    };
 
-  //   const encodedTx = protocol001Service.encodeInscription([commandTx]);
-  //   console.log(encodedTx);
-  // });
+    const encodedTx = protocol001Service.encodeInscription([commandTx]);
+    console.log(encodedTx);
+  });
 
   // it('transfer btc', async () => {
   //   await service.run();
