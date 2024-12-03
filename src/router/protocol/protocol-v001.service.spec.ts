@@ -88,8 +88,8 @@ describe('ProtocolV001Service', () => {
         await module.close()
     })
 
-    it('parse inscription by txid', async () => {
-        const inscription = await ordService.getInscriptionByTxid(`2ea8f8b111883d6884abecf8cd4932aa83f5fe792bcffa74702def1a335f1cb9`)
+    it.only('parse inscription by txid', async () => {
+        const inscription = await ordService.getInscriptionByTxid(`a8419e158f0fe78670908d96dc1ff00d86360f06710ba415dae3d183a47557c4`)
         const command = protocolV001Service.decodeInscription(inscription.content)
         console.log(command)
         for (const item of command) {
@@ -98,7 +98,7 @@ describe('ProtocolV001Service', () => {
         }
     })
 
-    it.only('Execute inscription transaction', async () => {
+    it('Execute inscription transaction', async () => {
         const inscription = await ordService.getInscriptionByTxid(`3f6e0df5a26ddbf62e003873581ba02e7b0d9b18e1b1862e813e72ec02acd020`,true)
         const status = await protocolV001Service.syncExecuteTransaction(inscription)
         console.log(status)

@@ -4,8 +4,8 @@ import {
     ExecutionContext,
     CallHandler,
 } from '@nestjs/common';
-import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { Observable, throwError } from 'rxjs';
+import { map, catchError } from 'rxjs/operators';
 
 @Injectable()
 export class ResponseInterceptor implements NestInterceptor {
@@ -17,6 +17,16 @@ export class ResponseInterceptor implements NestInterceptor {
                     data: data ?? {},
                     errorMessage: ''
                 };
+            }),
+            catchError((err) => {
+                // Catching exceptions and returning standardized error responses
+                return throwError(() => {
+                    return {
+                        code: -1,
+                        data: {},
+                        errorMessage: err.message || 'Internal Server Error',
+                    };
+                });
             }),
         );
     }
