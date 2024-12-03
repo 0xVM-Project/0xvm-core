@@ -75,7 +75,7 @@ export class PreExecutionService {
             _list,
             logIndex,
           );
-          this.logger.debug(`executeResult: ${executeResult}`)
+          this.logger.debug(`executeResult: ${executeResult}`);
 
           try {
             await this.pendingTx.update(
@@ -216,34 +216,32 @@ export class PreExecutionService {
           enablePackage = true;
         }
 
-        if (availableString && availableList && availableList?.length > 0) {
-          if (enablePackage) {
-            try {
-              const preBroadcastTx = await this.preBroadcastTx.save(
-                this.preBroadcastTx.create({
-                  content: availableString,
-                  commitTx: '',
-                  status: 1,
-                }),
+        if (enablePackage) {
+          try {
+            const preBroadcastTx = await this.preBroadcastTx.save(
+              this.preBroadcastTx.create({
+                content: availableString,
+                commitTx: '',
+                status: 1,
+              }),
+            );
+
+            if (preBroadcastTx) {
+              await this.preBroadcastTxItem.update(
+                {
+                  id: In(availableIdList),
+                  type: 2,
+                },
+                { preExecutionId: preBroadcastTx?.id },
               );
-
-              if (preBroadcastTx) {
-                await this.preBroadcastTxItem.update(
-                  {
-                    id: In(availableIdList),
-                    type: 2,
-                  },
-                  { preExecutionId: preBroadcastTx?.id },
-                );
-              }
-            } catch (error) {
-              this.logger.error('update package data failed');
-              throw error;
             }
+          } catch (error) {
+            this.logger.error('update package data failed');
+            throw error;
           }
-
-          list = list.filter((_item) => !availableIdList?.includes(_item.id));
         }
+
+        list = list.filter((_item) => !availableIdList?.includes(_item.id));
       }
     }
   }
