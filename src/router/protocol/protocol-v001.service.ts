@@ -178,6 +178,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         const xvmCurrentBlockNumber = xvmLatestBlockNumber + 1;
         const inscriptionHash = xvmCurrentBlockNumber.toString().padStart(64, '0')
         const txHashList: string[] = []
+        this.logger.debug(`commandList: ${commandList?.length}`)
 
         commandList?.map(async (command) => {
             let hash = "";
@@ -205,7 +206,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
                 }
 
                 try {
-                    await this.preBroadcastTxItem.save(
+                    const _preBroadcastTxItem = await this.preBroadcastTxItem.save(
                         this.preBroadcastTxItem.create({
                             pendingTxId,
                             type: 2,
@@ -216,6 +217,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
                             status: (hash || commandAction === InscriptionActionEnum.prev || commandAction === InscriptionActionEnum.mineBlock) ? 1 : 0
                         }),
                     );
+                    this.logger.debug(`_preBroadcastTxItem: ${_preBroadcastTxItem?.id}`)
                 } catch (error) {
                     this.logger.error("add preBroadcastTxItem failed")
                     throw error

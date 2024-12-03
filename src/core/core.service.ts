@@ -192,6 +192,7 @@ export class CoreService {
         while (!this.isExecutionTaskStop) {
             while (this.messageQueue?.length > 0) {
                 const mq = this.messageQueue.shift();
+                this.logger.debug(`consumerMQ: ${JSON.stringify(mq)}`);
 
                 if (mq && mq?.timestamp) {
                     if (mq?.type === "execute") {
@@ -244,6 +245,7 @@ export class CoreService {
             // get latest online btc block height
             const btcLatestBlockNumber = await this.indexerService.getLatestBlockNumberForBtc();
             const currentBtcBlockHeight = lastBtcBlockHeight + 1;
+            this.logger.debug(`chunk: ${lastBtcBlockHeight}/${btcLatestBlockNumber}`);
 
             if (!isNaN(btcLatestBlockNumber)) {
                 // when online btc block height bigger than last btc block height
@@ -327,12 +329,14 @@ export class CoreService {
     }
 
     async prePackage(isEnforce?: boolean) {
+        this.logger.debug("prePackage");
         await this.preExecutionService.package(isEnforce);
     }
 
     async executeMQ() {
         if (!this.isExecutionTaskStop) {
             this.messageQueue.push({ type: "execute", timestamp: Date.now() });
+            this.logger.debug(`executeMQ: ${JSON.stringify(this.messageQueue)}`);
             return true;
         }
 
@@ -342,6 +346,7 @@ export class CoreService {
     async chunkMQ() {
         if (!this.isExecutionTaskStop) {
             this.messageQueue.push({ type: "chunk", timestamp: Date.now() });
+            this.logger.debug(`chunkMQ: ${JSON.stringify(this.messageQueue)}`);
         }
     }
 }

@@ -75,6 +75,7 @@ export class PreExecutionService {
             _list,
             logIndex,
           );
+          this.logger.debug(`executeResult: ${executeResult}`)
 
           try {
             await this.pendingTx.update(
