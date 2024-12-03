@@ -12,10 +12,12 @@ import defaultConfig from 'src/config/default.config';
 import { SqliteModule } from 'src/common/sqlite/sqlite.module';
 import { AxiosModule } from 'src/common/axios/axios.module';
 import { BtcrpcModule } from 'src/common/api/btcrpc/btcrpc.module';
+import { BlockHashSnapshot } from 'src/entities/block-snapshot.entity';
 
 describe('IndexerService', () => {
   let module: TestingModule
   let service: IndexerService;
+  let dataSource: DataSource
 
   beforeAll(async () => {
     module = await Test.createTestingModule({
@@ -25,6 +27,8 @@ describe('IndexerService', () => {
           envFilePath: ['.env.local', '.env'],  // Specify the loading order
           load: [dbMysqlConfig, defaultConfig],
         }),
+        CommonModule,
+        TypeOrmModule.forFeature([BlockHashSnapshot]),
         AxiosModule,
         BtcrpcModule,
         SqliteModule,
@@ -35,6 +39,7 @@ describe('IndexerService', () => {
     }).compile();
 
     service = module.get<IndexerService>(IndexerService);
+    dataSource = module.get<DataSource>(DataSource);
   });
 
   afterAll(async () => {
@@ -51,7 +56,12 @@ describe('IndexerService', () => {
   })
 
   it('get inscription', async () => {
-    const inscription = await service.fetchInscription0xvmByBlock(2865749)
+    const inscription = await service.fetchInscription0xvmByBlock(56253)
+    console.log(inscription)
+  })
+
+  it.only('fetchNormalInscription0xvmByBlock', async () => {
+    const inscription = await service.fetchNormalInscription0xvmByBlock(56253)
     console.log(inscription)
   })
 

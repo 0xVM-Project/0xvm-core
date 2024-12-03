@@ -15,10 +15,22 @@ export class OrdService {
         private readonly btcrpcService: BtcrpcService,
     ) { }
 
-    async getInscriptionByTxid(txid: string): Promise<Inscription | null> {
-        const rawTransactionResponse = await this.btcrpcService.getRawtransaction(txid)
-        const tx = rawTransactionResponse.result
-        return this.ordService.getInscriptionContentData(tx.txid, tx.vin[0].txinwitness)
+    async getInscriptionByTxid(txid: string, isFetchBlockInfo: boolean = false): Promise<Inscription | null> {
+        try {
+            const rawTransactionResponse = await this.btcrpcService.getRawtransaction(txid)
+            const tx = rawTransactionResponse.result
+            const inscription = this.ordService.getInscriptionContentData(tx.txid, tx.vin[0].txinwitness)
+            if (isFetchBlockInfo) {
+                const { result: blockInfo } = await this.btcrpcService.getBlockheader(tx.blockhash)
+                inscription.blockHeight = blockInfo.height
+                inscription.timestamp = blockInfo.time
+            }
+            return inscription
+        } catch (error) {
+            const newError = new Error(`[GetInscriptionByTxid] Failed to obtain inscription information based on txid, by txid: ${txid}.`)
+            newError.stack = `${newError.stack}\nCaused by: ${error instanceof Error ? error.stack : error}`
+            throw newError
+        }
     }
 
     async getInscriptionByBlockHeight(blockHeight: number) {

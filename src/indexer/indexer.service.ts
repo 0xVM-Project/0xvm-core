@@ -27,6 +27,13 @@ export class IndexerService {
         return { block: blocks, timestamp: time }
     }
 
+    async fetchInscription0xvmByTxid(txid: string): Promise<Inscription> {
+        if (!txid || txid.length !== 64) {
+            throw new Error(`[FetchInscription0xvmByTxid] Invalid txid. by txid: ${txid}`)
+        }
+        return await this.ordService.getInscriptionByTxid(txid, true)
+    }
+
     async fetchInscription0xvmByBlock(blockHeight: string | number): Promise<{ inscriptionList: Inscription[], nextBlockHash: string, blockHash: string, allInscriptionCount: number, blockTimestamp: number }> {
         if (Number.isNaN(blockHeight)) {
             throw new Error(`blockHeight cannot be nan`)
@@ -77,7 +84,7 @@ export class IndexerService {
         return fundsSources.scriptPubKey.address
     }
 
-    async fetchNormalInscription0xvmByBlock(blockHeight: number){
+    async fetchNormalInscription0xvmByBlock(blockHeight: number) {
         if (Number.isNaN(blockHeight)) {
             throw new Error(`blockHeight cannot be nan`)
         }
@@ -99,10 +106,10 @@ export class IndexerService {
             }
             const protocol = this.routerService.from(inscriptionContent.content);
 
-            if(protocol){
+            if (protocol) {
                 const filterInscription = protocol.filterInscription(inscriptionContent);
 
-                if(filterInscription){
+                if (filterInscription) {
                     const inscriptionFor0xvm = protocol.isPrecomputeInscription(filterInscription.content)
 
                     if (inscriptionFor0xvm && !inscriptionFor0xvm.isPrecompute) {

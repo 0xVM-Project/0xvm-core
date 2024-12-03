@@ -15,6 +15,8 @@ import { RouterModule } from '../router.module';
 import { DataSource } from 'typeorm';
 import { sleep } from 'src/utils/times';
 import { OrdService } from 'src/ord/ord.service';
+import { PreBroadcastTxItem } from 'src/entities/pre-broadcast-tx-item.entity';
+import { XvmService } from 'src/xvm/xvm.service';
 
 const depositInscription1 = () => {
     const inscriptionContent = '0f0001DAAAAAAABgAIAAQABgAAAAQAAAABAAAADAAAAAgADAAIAAQACAAAAAgAAAACAAAA2gAAADB4Zjg2YTgwODQxZGNkNjUwMDgyNTIwODk0NjEzOTJmNDk4ZDc3Zjg0NzRlZjdkZDhhZTc0MzM1N2Y5OGE3MjNlYzg3MWZmOTczY2FmYTgwMDA4MDFjYTA5MzE2MmY2MGVmYmYzYzFjYTNhNGNmMzM0NjU2NmEzOTZkZTRiZGU4YWY5ODQyNzMwM2UwODk5MzMxNjJkMjU4YTAzNjRmNzhkODZiYWYzYTJmZmE3NGYwZDQxOWU0NWM2ZTI1ZDZiNzJlNTc5NTdhYjU5NjA3ODRmNDE2YWFlNmE0AAA='
@@ -55,11 +57,12 @@ describe('ProtocolV001Service', () => {
     let module: TestingModule
     let dataSource: DataSource;
     let ordService: OrdService
+    let xvmService: XvmService
 
     beforeAll(async () => {
         module = await Test.createTestingModule({
             imports: [
-                TypeOrmModule.forFeature([BtcHistoryTx]),
+                TypeOrmModule.forFeature([BtcHistoryTx, PreBroadcastTxItem]),
                 SqliteModule,
                 CommonModule,
                 HashMappingModule,
@@ -77,6 +80,7 @@ describe('ProtocolV001Service', () => {
         protocolV001Service = module.get<ProtocolV001Service>(ProtocolV001Service);
         ordService = module.get<OrdService>(OrdService)
         dataSource = module.get<DataSource>(DataSource);
+        xvmService = module.get<XvmService>(XvmService);
     });
 
     afterAll(async () => {
@@ -84,9 +88,19 @@ describe('ProtocolV001Service', () => {
         await module.close()
     })
 
-    it.only('parse inscription by txid', async () => {
-        const inscription = await ordService.getInscriptionByTxid(`15dcaab47ea43fb0298d02aacb0f71bc00bbe49db301785a04d9345de6f557b5`)
+    it('parse inscription by txid', async () => {
+        const inscription = await ordService.getInscriptionByTxid(`2ea8f8b111883d6884abecf8cd4932aa83f5fe792bcffa74702def1a335f1cb9`)
         const command = protocolV001Service.decodeInscription(inscription.content)
         console.log(command)
+        for (const item of command) {
+            const tx = xvmService.unSignTransaction(item.data)
+            console.log(`action: ${item.action} sender: ${tx.from} tx: ${JSON.stringify(await tx.toJSON(), null, 2)}`)
+        }
+    })
+
+    it.only('Execute inscription transaction', async () => {
+        const inscription = await ordService.getInscriptionByTxid(`3f6e0df5a26ddbf62e003873581ba02e7b0d9b18e1b1862e813e72ec02acd020`,true)
+        const status = await protocolV001Service.syncExecuteTransaction(inscription)
+        console.log(status)
     })
 });

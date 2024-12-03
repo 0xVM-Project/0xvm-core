@@ -96,8 +96,8 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
 
     async syncExecuteTransaction(inscription: Inscription): Promise<boolean> {
         const xvmLatestBlockNumber = await this.xvmService.getLatestBlockNumber();
-        if (!xvmLatestBlockNumber || isNaN(xvmLatestBlockNumber)) {
-            throw new Error(`get xvmLatestBlockNumber error`)
+        if (xvmLatestBlockNumber == null || xvmLatestBlockNumber == undefined || isNaN(xvmLatestBlockNumber)) {
+            throw new Error(`get xvmLatestBlockNumber error, xvmLatestBlockNumber is ${xvmLatestBlockNumber}`)
         }
         if (!inscription?.content || !inscription?.inscriptionId) {
             throw new Error(`Inscription content or inscription id cannot be empty`)
@@ -110,18 +110,25 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         const inscriptionSignAddressList: string[] = []
         let logIndex = 0
         for (let index = 0; index < inscriptionCommandList.length; index++) {
+            const baseTransactionInfo = {
+                sender: '',
+                to: ''
+            }
             const command = inscriptionCommandList[index];
             const hash = await this.commandExecution(command, inscription.hash, ExecutionModeEnum.Normal)
-            
+            // parse signTransaction get transaction base info
+            const unsingTransaction = this.xvmService.unSignTransaction(command.data)
+            if (unsingTransaction) {
+                baseTransactionInfo.sender = unsingTransaction.from
+                baseTransactionInfo.to = unsingTransaction.to
+                inscriptionSignAddressList.push(baseTransactionInfo.sender)
+            }
+
             if (hash) {
                 transactionHash.push(hash)
-                const unsingTransaction = this.xvmService.unSignTransaction(command.data)
-                const xvmFrom = unsingTransaction.from
-                const xvmTo = unsingTransaction.to
-                unsingTransaction && inscriptionSignAddressList.push(xvmFrom)
                 const executeTransactionMappingHash: HashMappingInterface = {
-                    xFromAddress: xvmFrom ?? '',
-                    xToAddress: xvmTo ?? '',
+                    xFromAddress: baseTransactionInfo.sender ?? '',
+                    xToAddress: baseTransactionInfo.to ?? '',
                     btcHash: inscription.hash,
                     xvmHash: hash,
                     logIndex: logIndex
@@ -140,7 +147,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
                         data: command.data ?? "",
                         // set current btc block height as xvmBlockHeight for hashMapping
                         xvmBlockHeight: xvmLatestBlockNumber + 1,
-                        status: hash ? 1: 0
+                        status: hash ? 1 : 0
                     }),
                 );
             } catch (error) {
@@ -157,31 +164,31 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         return transactionHash?.every(_item => Boolean(_item))
     }
 
-    async preExecuteTransaction(pendingTxId:number, commandList: CommandsV1Type[], logIndex:number) {
-        if(!commandList || !commandList?.length){
+    async preExecuteTransaction(pendingTxId: number, commandList: CommandsV1Type[], logIndex: number) {
+        if (!commandList || !commandList?.length) {
             return false
         }
-        
+
         const xvmLatestBlockNumber = await this.xvmService.getLatestBlockNumber();
         if (isNaN(xvmLatestBlockNumber)) {
             throw new Error(`get xvmLatestBlockNumber error`)
         }
         let _logIndex = logIndex;
-        const xvmCurrentBlockNumber = xvmLatestBlockNumber+1;
+        const xvmCurrentBlockNumber = xvmLatestBlockNumber + 1;
         const inscriptionHash = xvmCurrentBlockNumber.toString().padStart(64, '0')
         const txHashList: string[] = []
 
-        commandList?.map(async(command) => {
+        commandList?.map(async (command) => {
             let hash = "";
             const commandAction = command?.action;
             const commandData = command?.data;
 
-            if(commandAction && commandAction !== InscriptionActionEnum.mineBlock && commandData){
+            if (commandAction && commandAction !== InscriptionActionEnum.mineBlock && commandData) {
                 hash = await this.commandExecution(command, inscriptionHash, ExecutionModeEnum.PreExecution);
 
                 if (hash) {
-                    txHashList.push(hash);
                     const unsingTransaction = this.xvmService.unSignTransaction(command.data);
+                    txHashList.push(hash);
                     const xvmFrom = unsingTransaction.from;
                     const xvmTo = unsingTransaction.to;
                     const executeTransactionMappingHash: HashMappingInterface = {
@@ -189,7 +196,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
                         xToAddress: xvmTo ?? '',
                         btcHash: inscriptionHash,
                         xvmHash: hash,
-                        logIndex:_logIndex
+                        logIndex: _logIndex
                     }
                     await this.hashMappingService.bindHash(executeTransactionMappingHash)
                     this.logger.log(`[${xvmCurrentBlockNumber}] ${ExecutionModeEnum.PreExecution} transaction execute success, action:${InscriptionActionEnum[command.action]}  hash: ${hash}`)
@@ -205,7 +212,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
                             data: commandData,
                             // set current btc block height as xvmBlockHeight for hashMapping
                             xvmBlockHeight: xvmCurrentBlockNumber,
-                            status: (hash || commandAction === InscriptionActionEnum.prev || commandAction === InscriptionActionEnum.mineBlock) ? 1: 0
+                            status: (hash || commandAction === InscriptionActionEnum.prev || commandAction === InscriptionActionEnum.mineBlock) ? 1 : 0
                         }),
                     );
                 } catch (error) {
