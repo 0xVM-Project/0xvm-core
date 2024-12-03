@@ -3,7 +3,7 @@ import { CommandsV1Type, ExecutionModeEnum } from "./interface/protocol.interfac
 export interface IProtocol<I, C> {
     filterInscription(inscriptions: I): I | null
     decodeInscription(inscriptionContent: string): Array<C>
-    syncExecuteTransaction(inscription: I): Promise<boolean>
+    syncExecuteTransaction(inscription: I):  Promise<Array<string>>
     preExecuteTransaction(pendingTxId:number, commandList: CommandsV1Type[], logIndex:number): Promise<boolean>
     encodeInscription(inscriptionArray: Array<C>): string | null
 

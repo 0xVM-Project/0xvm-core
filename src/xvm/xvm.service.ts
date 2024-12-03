@@ -23,6 +23,7 @@ export class XvmService {
     private readonly xbtcPoolContract: ethers.Contract
     private readonly maxRetryCount: number = 6
     private retryCount: number = 0
+    private latestMineBlockNumber: number = 0
 
     constructor(
         @Inject(defaultConfig.KEY) private readonly defaultConf: ConfigType<typeof defaultConfig>,
@@ -41,6 +42,19 @@ export class XvmService {
         this.sysAddress = this.sysWallet.address
         this.chainId = this.defaultConf.xvm.xvmChainId ?? 42
         this.xbtcPoolContract = new ethers.Contract(this.xbtcPoolAddress, JSON.stringify(XBTCPoolABI), this.sysWallet)
+    }
+
+    private async cacheLatestMineBlockNumber() {
+        if (this.latestMineBlockNumber == 0) {
+            this.latestMineBlockNumber = await this.getLatestBlockNumber()
+        } else {
+            this.latestMineBlockNumber += 1
+        }
+        return this.latestMineBlockNumber
+    }
+
+    get fetchLatestMineBlockNumberCache() {
+        return this.latestMineBlockNumber
     }
 
     async rpcClient<T>(method: string, params: any[]) {
@@ -142,6 +156,7 @@ export class XvmService {
         if ('error' in response.data) {
             throw new Error(`Minter Block fail. error: ${JSON.stringify(response.data.error)}`)
         }
+        await this.cacheLatestMineBlockNumber()
         return response.data.result
     }
 

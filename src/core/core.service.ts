@@ -119,6 +119,7 @@ export class CoreService {
             }
             nextSort = history[history.length - 1].sort
             // execution inscription
+            const executeTransaction: Record<number, { inscriptionNumber: number, txCount: number }> = {}
             for (let index = 0; index < history.length; index++) {
                 const record = history[index]
                 const isPrecompute = record.sort.toString().slice(-1) == '1' ? true : false
@@ -131,7 +132,15 @@ export class CoreService {
                     hash: record.hash
                 }
                 const executeResult = await this.routerService.from(inscription.content).syncExecuteTransaction(inscription)
-                this.logger.log(`Sync tx execution ${executeResult ? "success" : "failed"} for ${record.blockHeight}`)
+                if (executeTransaction[record.blockHeight]) {
+                    executeTransaction[record.blockHeight].inscriptionNumber += 1
+                    executeTransaction[record.blockHeight].txCount += executeResult.length
+                } else {
+                    executeTransaction[record.blockHeight] = {
+                        inscriptionNumber: 1,
+                        txCount: executeResult.length
+                    }
+                }
                 // normal tx mine block
                 if (!isPrecompute) {
                     // Update the status to ensure whether a block needs to be produced
@@ -147,9 +156,21 @@ export class CoreService {
                     }
                     // mine block
                     if (isMineBlock) {
+                        Object.entries(executeTransaction).forEach(([key, value]) => {
+                            const blockHeight = Number(key)
+                            const { inscriptionNumber, txCount } = executeTransaction[key] as { inscriptionNumber: number, txCount: number }
+                            this.logger.log(`Sync Normal transaction inscriptionNumber: ${inscriptionNumber} success tx: ${txCount} for ${blockHeight}`)
+                        })
                         const normalMineBlockHash = await this.xvmService.minterBlock(record.blockTimestamp)
-                        this.logger.log(`Normal Inscription Generate Block ${record.blockHeight} is ${normalMineBlockHash}`)
+                        this.logger.log(`Normal Inscription Generate Block ${this.xvmService.fetchLatestMineBlockNumberCache} is ${normalMineBlockHash}`)
                     }
+                } else {
+                    // Pre-Execute logs
+                    Object.entries(executeTransaction).forEach(([key, value]) => {
+                        const blockHeight = Number(key)
+                        const { inscriptionNumber, txCount } = executeTransaction[key] as { inscriptionNumber: number, txCount: number }
+                        this.logger.log(`Sync Pre-Execute transaction inscriptionNumber: ${inscriptionNumber} success tx: ${txCount} for ${blockHeight}`)
+                    })
                 }
                 await this.btcHistoryTxRepository.update(
                     { sort: record.sort },
@@ -291,7 +312,7 @@ export class CoreService {
 
             // mineBlock
             const minterBlockHash = await this.xvmService.minterBlock(blockTimestamp);
-            this.logger.log(`Precompute Inscription Generate Block ${currentBlockNumber} is ${minterBlockHash}`);
+            this.logger.log(`Precompute Inscription Generate Block ${this.xvmService.fetchLatestMineBlockNumberCache} is ${minterBlockHash}`);
 
             try {
                 if (lastTxHash) {

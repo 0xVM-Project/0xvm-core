@@ -61,8 +61,8 @@ describe('IndexerService', () => {
   })
 
   it.only('fetchNormalInscription0xvmByBlock', async () => {
-    const inscription = await service.fetchNormalInscription0xvmByBlock(56253)
-    console.log(inscription)
+    const inscription = await service.fetchNormalInscription0xvmByBlock(56363)
+    console.log(JSON.stringify(inscription,null,2))
   })
 
   describe('GenesisInscriptionAddress', () => {

@@ -24,6 +24,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Type> {
     private readonly logger = new Logger(ProtocolV001Service.name)
     public readonly version = ProtocolVersionEnum['0f0001']
+    private currentBlockNumberFor0xvm: number = 0
 
     constructor(
         @Inject(defaultConfig.KEY) private readonly defaultConf: ConfigType<typeof defaultConfig>,
@@ -94,7 +95,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         return await headers[actionEnum](command.data, inscriptionHash, executionMode)
     }
 
-    async syncExecuteTransaction(inscription: Inscription): Promise<boolean> {
+    async syncExecuteTransaction(inscription: Inscription): Promise<Array<string>> {
         const xvmLatestBlockNumber = await this.xvmService.getLatestBlockNumber();
         if (xvmLatestBlockNumber == null || xvmLatestBlockNumber == undefined || isNaN(xvmLatestBlockNumber)) {
             throw new Error(`get xvmLatestBlockNumber error, xvmLatestBlockNumber is ${xvmLatestBlockNumber}`)
@@ -161,7 +162,7 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         }
         const rewardReceiveAddress = inscriptionSignAddressList.at(0)
         await this.inscriptionRewards(rewardReceiveAddress, inscription.hash)
-        return transactionHash?.every(_item => Boolean(_item))
+        return transactionHash
     }
 
     async preExecuteTransaction(pendingTxId: number, commandList: CommandsV1Type[], logIndex: number) {
@@ -229,7 +230,13 @@ export class ProtocolV001Service extends ProtocolBase<Inscription, CommandsV1Typ
         const blockHeight = parseInt(data.slice(2, 12), 16)
         const blockTimestamp = parseInt(data.slice(12), 16)
         const minterBlockHash = await this.xvmService.minterBlock(blockTimestamp)
-        this.logger.log(`[MineBlockFor${executionMode.toUpperCase()}] Generate Block ${blockHeight} is ${minterBlockHash} for Inscription Hash: ${inscriptionHash}`)
+        if (this.currentBlockNumberFor0xvm == 0) {
+            const { result: latestBlockBy0xvm } = await this.xvmService.getLatestBlock()
+            this.currentBlockNumberFor0xvm = parseInt(latestBlockBy0xvm.timestamp.slice(2), 16)
+        } else {
+            this.currentBlockNumberFor0xvm += 1
+        }
+        this.logger.log(`[MineBlockFor${executionMode.toUpperCase()}] Generate Block ${this.xvmService.fetchLatestMineBlockNumberCache} is ${minterBlockHash} for Inscription Hash: ${inscriptionHash}`)
         return minterBlockHash
     }
 

@@ -13,8 +13,8 @@ export class ProtNotValidService extends ProtocolBase<Inscription, BaseCommandsT
         return []
     }
 
-    async syncExecuteTransaction(inscription: any): Promise<boolean> {
-        return false
+    async syncExecuteTransaction(inscription: any):  Promise<Array<string>> {
+        return []
     }
 
     async preExecuteTransaction(pendingTxId:number, commandList: CommandsV1Type[], logIndex:number): Promise<boolean> {
