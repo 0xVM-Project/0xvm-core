@@ -216,7 +216,13 @@ export class PreExecutionService {
           enablePackage = true;
         }
 
-        if (enablePackage) {
+        if (
+          enablePackage &&
+          availableList &&
+          availableList?.length > 0 &&
+          availableIdList &&
+          availableIdList?.length > 0
+        ) {
           try {
             const preBroadcastTx = await this.preBroadcastTx.save(
               this.preBroadcastTx.create({
